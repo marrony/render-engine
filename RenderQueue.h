@@ -9,7 +9,7 @@ class RenderQueue {
 public:
     RenderQueue(Device& device) : device(device), itemsCount(0) { }
 
-    void submit(StCommand* cmd) {
+    void submit(Command* cmd) {
         items[itemsCount].cmd = cmd;
         items[itemsCount].count = 0;
         itemsCount++;
@@ -25,7 +25,7 @@ public:
 
     void submit() {
         bool nonDefaultState[COMMAND_MAX];
-        StStateCommand* previousState[COMMAND_MAX];
+        StateCommand* previousState[COMMAND_MAX];
 
         memset(previousState, 0, sizeof(previousState));
         memset(nonDefaultState, 0xff, sizeof(nonDefaultState));
@@ -43,7 +43,7 @@ public:
                 State* state = item.states[j];
 
                 for (int k = 0; k < state->commandCount; k++) {
-                    StStateCommand* stateCmd = state->commands[k];
+                    StateCommand* stateCmd = state->commands[k];
 
                     extern int sizeCommand[];
 
@@ -76,7 +76,7 @@ public:
     }
 
 private:
-    void execute(StCommand* cmd) {
+    void execute(Command* cmd) {
         extern FnSubmitCommand submitCommand[];
 
         executedCommands++;
@@ -84,7 +84,7 @@ private:
     }
 
     struct Item {
-        StCommand* cmd;
+        Command* cmd;
         State* states[8];
         int count;
     };
@@ -95,7 +95,7 @@ private:
     int executedCommands;
     int skippedCommands;
 
-    StStateCommand* defaults[COMMAND_MAX];
+    StateCommand* defaults[COMMAND_MAX];
 };
 
 #endif //RENDERQUEUE_H

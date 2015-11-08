@@ -80,14 +80,13 @@ struct Model {
 struct Material {
     State* state;
 
-    static Material* create(Allocator& allocator, Program program, Texture2D texture, Sampler sampler, ConstantBuffer constantBuffer, const void* data, size_t size) {
+    static Material* create(Allocator& allocator, Program program, Texture2D texture, Sampler sampler) {
         Material* material = (Material*) allocator.allocate(sizeof(Material));
 
-        material->state = State::create(allocator, 4);
+        material->state = State::create(allocator, 3);
         material->state->commands[0] = BindProgram::create(allocator, program);
         material->state->commands[1] = BindTexture::create(allocator, program, "in_Sampler", texture, 0);
         material->state->commands[2] = BindSampler::create(allocator, program, sampler, 0);
-        material->state->commands[3] = CopyConstantBuffer::create(allocator, program, constantBuffer, data, size);
 
         return material;
     }
@@ -142,13 +141,14 @@ const char* vertexSource = STR(
         layout(std140) uniform in_ShaderData {
             uniform mat3 in_Rotation;
             uniform vec4 in_Color2;
+            uniform float in_Scale[4];
         };
 
         out vec2 var_Texture;
         out vec4 var_Color;
 
         void main() {
-            gl_Position = vec4(in_Rotation * in_Position, 1);
+            gl_Position = vec4(in_Rotation * in_Position * in_Scale[gl_InstanceID], 1);
             var_Texture = in_Texture;
             var_Color = vec4(in_Color, 1);
         }
@@ -161,6 +161,7 @@ const char* fragmentSource = STR(
         layout(std140) uniform in_ShaderData {
             uniform mat3 in_Rotation;
             uniform vec4 in_Color2;
+            uniform float in_Scale[4];
         };
 
         uniform sampler2D in_Sampler;
@@ -216,17 +217,23 @@ int main(int argc, char* argv[]) {
     struct {
         float in_Rotation[12];
         float in_Color2[4];
+        float in_Scale0[4];
+        float in_Scale1[4];
+        float in_Scale2[4];
+        float in_Scale3[4];
     } in_vertexData = {
             1, 0, 0, 0,
             0, 1, 0, 0,
             0, 0, 1, 0,
-            1, 1, 1, 1
+            1, 1, 1, 1,
+            1.00, 0, 0, 0,
+            0.75, 0, 0, 0,
+            0.50, 0, 0, 0,
+            0.25, 0, 0, 0,
     };
 
     int bindingPoint = 0;
-    int index = glGetUniformBlockIndex(program.id, "in_ShaderData");
-    glUniformBlockBinding(program.id, index, bindingPoint);
-
+    device.setConstantBufferBinding(program, "in_ShaderData", bindingPoint);
     ConstantBuffer constantBuffer = device.createConstantBuffer(sizeof(in_vertexData), &in_vertexData, bindingPoint);
 
     const uint32_t black = 0xff000000;
@@ -240,7 +247,7 @@ int main(int argc, char* argv[]) {
     };
     Texture2D texture0 = device.createTexture(4, 4, pixels0);
     Sampler sampler0 = device.createSampler(GL_NEAREST);
-    Material* material0 = Material::create(allocator, program, texture0, sampler0, constantBuffer, &in_vertexData, sizeof(in_vertexData));
+    Material* material0 = Material::create(allocator, program, texture0, sampler0);
 
     const uint32_t pixels1[] = {
             black, white, black, white, black, white, black, white,
@@ -254,7 +261,7 @@ int main(int argc, char* argv[]) {
     };
     Texture2D texture1 = device.createTexture(8, 8, pixels1);
     Sampler sampler1 = device.createSampler(GL_LINEAR);
-    Material* material1 = Material::create(allocator, program, texture1, sampler1, constantBuffer, &in_vertexData, sizeof(in_vertexData));
+    Material* material1 = Material::create(allocator, program, texture1, sampler1);
 
     float vertexData[] = {
             -0.5, -0.5, 0.0,
@@ -311,17 +318,23 @@ int main(int argc, char* argv[]) {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    StStateCommand* setViewport0 = SetViewport::create(allocator, 0.5, 0.5, 1.0, 1.0);
-    StStateCommand* setViewport1 = SetViewport::create(allocator, 0.0, 0.0, 0.5, 0.5);
-    StStateCommand* setViewport2 = SetViewport::create(allocator, 0.0, 0.5, 0.5, 1.0);
-    StStateCommand* setViewport3 = SetViewport::create(allocator, 0.5, 0.0, 1.0, 0.5);
-    StStateCommand* setViewport4 = SetViewport::create(allocator, 0.25, 0.25, 0.75, 0.75);
-    StStateCommand* setViewport5 = SetViewport::create(allocator, 0, 0, 1, 1);
+    StateCommand* setViewport0 = SetViewport::create(allocator, 0.5, 0.5, 1.0, 1.0);
+    StateCommand* setViewport1 = SetViewport::create(allocator, 0.0, 0.0, 0.5, 0.5);
+    StateCommand* setViewport2 = SetViewport::create(allocator, 0.0, 0.5, 0.5, 1.0);
+    StateCommand* setViewport3 = SetViewport::create(allocator, 0.5, 0.0, 1.0, 0.5);
+    StateCommand* setViewport4 = SetViewport::create(allocator, 0.25, 0.25, 0.75, 0.75);
+    StateCommand* setViewport5 = SetViewport::create(allocator, 0, 0, 1, 1);
 
-    StStateCommand* clearColor = ClearColor::create(allocator, 0.15, 0.15, 0.15, 1);
-    StStateCommand* clearColor2 = ClearColor::create(allocator, 0, 1, 0.15, 1);
+    StateCommand* clearColor = ClearColor::create(allocator, 0.15, 0.15, 0.15, 1);
+    StateCommand* clearColor2 = ClearColor::create(allocator, 0, 1, 0.15, 1);
 
     RenderQueue renderQueue(device);
+
+    Framebuffer framebuffer = device.createFramebuffer();
+    Renderbuffer depthStencil = device.createRenderbuffer(width, height);
+    Texture2D renderTexture = device.createTexture(width, height, nullptr);
+    device.bindRenderbufferToFramebuffer(framebuffer, depthStencil);
+    device.bindTextureToFramebuffer(framebuffer, renderTexture, 0);
 
     float angle = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -338,6 +351,8 @@ int main(int argc, char* argv[]) {
         in_vertexData.in_Color2[0] -= 0.00001;
         in_vertexData.in_Color2[1] -= 0.00002;
         in_vertexData.in_Color2[2] -= 0.00003;
+
+        device.copyConstantBuffer(constantBuffer, &in_vertexData, sizeof(in_vertexData));
 
         renderQueue.submit(&setViewport0->command);
         renderQueue.submit(&clearColor->command);
@@ -362,7 +377,19 @@ int main(int argc, char* argv[]) {
 
         renderQueue.submit(&setViewport5->command);
 
+        device.bindFramebuffer(framebuffer);
+
         renderQueue.submit();
+
+        Framebuffer nullFramebuffer = {0};
+        device.bindDrawFramebuffer(nullFramebuffer);
+        device.bindReadFramebuffer(framebuffer);
+
+        glBlitFramebuffer(0, 0, width, height,
+                          0, 0, width, height,
+                          GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+        device.bindFramebuffer(nullFramebuffer);
 
         fontItalic.printText(10, 180, "My font example");
         fontRegular.printText(10, 130, "Memory used %ld bytes", allocator.memoryUsed());

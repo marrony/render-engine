@@ -7,6 +7,7 @@
 
 enum CommandType {
     DRAW_TRIANGLES = 0,
+    DRAW_TRIANGLES_INSTANCED,
     SET_VIEWPORT,
     CLEAR_COLOR,
     COPY_CONSTANT_BUFFER,
@@ -14,31 +15,29 @@ enum CommandType {
     BIND_PROGRAM,
     BIND_TEXTURE,
     BIND_SAMPLER,
-    BIND_CONSTANT4,
-    BIND_MATRIX3,
     COMMAND_MAX
 };
 
-struct StCommand {
+struct Command {
     uint8_t id;
 };
 
-union StStateCommand {
-    StCommand command;
+union StateCommand {
+    Command command;
     uint8_t id;
 };
 
 union StDrawCommand {
-    StCommand command;
+    Command command;
     uint8_t id;
 };
 
 struct State {
     int commandCount;
-    StStateCommand* commands[];
+    StateCommand* commands[];
 
     static State* create(Allocator& allocator, int commandCount) {
-        size_t nbytes = sizeof(State) + commandCount * sizeof(StStateCommand*);
+        size_t nbytes = sizeof(State) + commandCount * sizeof(StateCommand*);
 
         State* state = (State*) allocator.allocate(nbytes);
         state->commandCount = commandCount;
@@ -55,12 +54,12 @@ T* createCommand(Allocator& allocator) {
 }
 
 struct ClearColor {
-    StStateCommand command;
+    StateCommand command;
     float r, g, b, a;
 
     static const uint8_t TYPE = CLEAR_COLOR;
 
-    static StStateCommand* create(Allocator& allocator, float r, float g, float b, float a) {
+    static StateCommand* create(Allocator& allocator, float r, float g, float b, float a) {
         ClearColor* clearColor = createCommand<ClearColor>(allocator);
         clearColor->r = r;
         clearColor->g = g;
@@ -71,12 +70,12 @@ struct ClearColor {
 
     static void submit(Device& device, ClearColor* cmd) {
         glClearColor(cmd->r, cmd->g, cmd->b, cmd->a);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 };
 
 struct SetViewport {
-    StStateCommand command;
+    StateCommand command;
     float x;
     float y;
     float width;
@@ -84,7 +83,7 @@ struct SetViewport {
 
     static const uint8_t TYPE = SET_VIEWPORT;
 
-    static StStateCommand* create(Allocator& allocator, float x, float y, float width, float height) {
+    static StateCommand* create(Allocator& allocator, float x, float y, float width, float height) {
         SetViewport* setViewport = createCommand<SetViewport>(allocator);
         setViewport->x = x;
         setViewport->y = y;
@@ -112,17 +111,15 @@ struct SetViewport {
 };
 
 struct CopyConstantBuffer {
-    StStateCommand command;
-    Program program;
+    StateCommand command;
     ConstantBuffer constantBuffer;
     const void* data;
     size_t size;
 
     static const uint8_t TYPE = COPY_CONSTANT_BUFFER;
 
-    static StStateCommand* create(Allocator& allocator, Program program, ConstantBuffer constantBuffer, const void* data, size_t size) {
+    static StateCommand* create(Allocator& allocator, ConstantBuffer constantBuffer, const void* data, size_t size) {
         CopyConstantBuffer* copyConstantBuffer = createCommand<CopyConstantBuffer>(allocator);
-        copyConstantBuffer->program = program;
         copyConstantBuffer->constantBuffer = constantBuffer;
         copyConstantBuffer->data = data;
         copyConstantBuffer->size = size;
@@ -130,17 +127,17 @@ struct CopyConstantBuffer {
     }
 
     static void submit(Device& device, CopyConstantBuffer* cmd) {
-        device.copyConstantBuffer(cmd->program, cmd->constantBuffer, cmd->data, cmd->size);
+        device.copyConstantBuffer(cmd->constantBuffer, cmd->data, cmd->size);
     }
 };
 
 struct BindVertexArray {
-    StStateCommand command;
+    StateCommand command;
     VertexArray vertexArray;
 
     static const uint8_t TYPE = BIND_VERTEX_ARRAY;
 
-    static StStateCommand* create(Allocator& allocator, VertexArray vertexArray) {
+    static StateCommand* create(Allocator& allocator, VertexArray vertexArray) {
         BindVertexArray* bindVertexArray = createCommand<BindVertexArray>(allocator);
         bindVertexArray->vertexArray = vertexArray;
         return &bindVertexArray->command;
@@ -152,12 +149,12 @@ struct BindVertexArray {
 };
 
 struct BindProgram {
-    StStateCommand command;
+    StateCommand command;
     Program program;
 
     static const uint8_t TYPE = BIND_PROGRAM;
 
-    static StStateCommand* create(Allocator& allocator, Program program) {
+    static StateCommand* create(Allocator& allocator, Program program) {
         BindProgram* bindProgram = createCommand<BindProgram>(allocator);
         bindProgram->program = program;
         return &bindProgram->command;
@@ -168,57 +165,15 @@ struct BindProgram {
     }
 };
 
-struct BindConstant4 {
-    StStateCommand command;
-    Program program;
-    const char* name;
-    float* value;
-
-    static const uint8_t TYPE = BIND_CONSTANT4;
-
-    static StStateCommand* create(Allocator& allocator, Program program, const char* name, float* value) {
-        BindConstant4* bindConstant = createCommand<BindConstant4>(allocator);
-        bindConstant->program = program;
-        bindConstant->name = name;
-        bindConstant->value = value;
-        return &bindConstant->command;
-    }
-
-    static void submit(Device& device, BindConstant4* cmd) {
-        device.setValue(cmd->program, cmd->name, cmd->value);
-    }
-};
-
-struct BindMatrix3 {
-    StStateCommand command;
-    Program program;
-    const char* name;
-    float* value;
-
-    static const uint8_t TYPE = BIND_MATRIX3;
-
-    static StStateCommand* create(Allocator& allocator, Program program, const char* name, float* value) {
-        BindMatrix3* bindMatrix = createCommand<BindMatrix3>(allocator);
-        bindMatrix->program = program;
-        bindMatrix->name = name;
-        bindMatrix->value = value;
-        return &bindMatrix->command;
-    }
-
-    static void submit(Device& device, BindMatrix3* cmd) {
-        device.setMatrix(cmd->program, cmd->name, *cmd->value);
-    }
-};
-
 struct BindSampler {
-    StStateCommand command;
+    StateCommand command;
     Program program;
     Sampler sampler;
     int unit;
 
     static const uint8_t TYPE = BIND_SAMPLER;
 
-    static StStateCommand* create(Allocator& allocator, Program program, Sampler sampler, int unit) {
+    static StateCommand* create(Allocator& allocator, Program program, Sampler sampler, int unit) {
         BindSampler* bindSampler = createCommand<BindSampler>(allocator);
         bindSampler->program = program;
         bindSampler->sampler = sampler;
@@ -232,7 +187,7 @@ struct BindSampler {
 };
 
 struct BindTexture {
-    StStateCommand command;
+    StateCommand command;
     Program program;
     const char* name;
     Texture2D texture;
@@ -240,7 +195,7 @@ struct BindTexture {
 
     static const uint8_t TYPE = BIND_TEXTURE;
 
-    static StStateCommand* create(Allocator& allocator, Program program, const char* name, Texture2D texture,
+    static StateCommand* create(Allocator& allocator, Program program, const char* name, Texture2D texture,
                                   int unit) {
         BindTexture* bindTexture = createCommand<BindTexture>(allocator);
         bindTexture->program = program;
@@ -274,10 +229,32 @@ struct DrawTriangles {
     }
 };
 
-typedef void (* FnSubmitCommand)(Device& device, StCommand* command);
+struct DrawTrianglesInstanced {
+    StDrawCommand command;
+    int offset;
+    int count;
+    int instances;
+
+    static const uint8_t TYPE = DRAW_TRIANGLES_INSTANCED;
+
+    static StDrawCommand* create(Allocator& allocator, int offset, int count, int instances) {
+        DrawTrianglesInstanced* drawTrianglesInstanced = createCommand<DrawTrianglesInstanced>(allocator);
+        drawTrianglesInstanced->offset = offset;
+        drawTrianglesInstanced->count = count;
+        drawTrianglesInstanced->instances = instances;
+        return &drawTrianglesInstanced->command;
+    }
+
+    static void submit(Device& device, DrawTrianglesInstanced* cmd) {
+        device.drawTrianglesInstanced(cmd->offset, cmd->count, cmd->instances);
+    }
+};
+
+typedef void (* FnSubmitCommand)(Device& device, Command* command);
 
 FnSubmitCommand submitCommand[] = {
         [DRAW_TRIANGLES] = FnSubmitCommand(DrawTriangles::submit),
+        [DRAW_TRIANGLES_INSTANCED] = FnSubmitCommand(DrawTrianglesInstanced::submit),
         [CLEAR_COLOR] = FnSubmitCommand(ClearColor::submit),
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
@@ -285,12 +262,11 @@ FnSubmitCommand submitCommand[] = {
         [BIND_PROGRAM] = FnSubmitCommand(BindProgram::submit),
         [BIND_TEXTURE] = FnSubmitCommand(BindTexture::submit),
         [BIND_SAMPLER] = FnSubmitCommand(BindSampler::submit),
-        [BIND_CONSTANT4] = FnSubmitCommand(BindConstant4::submit),
-        [BIND_MATRIX3] = FnSubmitCommand(BindMatrix3::submit),
 };
 
 int sizeCommand[] = {
         [DRAW_TRIANGLES] = sizeof(DrawTriangles),
+        [DRAW_TRIANGLES_INSTANCED] = sizeof(DrawTrianglesInstanced),
         [CLEAR_COLOR] = sizeof(ClearColor),
         [SET_VIEWPORT] = sizeof(SetViewport),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
@@ -298,8 +274,6 @@ int sizeCommand[] = {
         [BIND_PROGRAM] = sizeof(BindProgram),
         [BIND_TEXTURE] = sizeof(BindTexture),
         [BIND_SAMPLER] = sizeof(BindSampler),
-        [BIND_CONSTANT4] = sizeof(BindConstant4),
-        [BIND_MATRIX3] = sizeof(BindMatrix3),
 };
 
 #endif //COMMANDS_H

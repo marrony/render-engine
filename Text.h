@@ -75,7 +75,7 @@ public:
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-            characters[ch].texture.texId = texture;
+            characters[ch].texture.id = texture;
             characters[ch].size[0] = face->glyph->bitmap.width;
             characters[ch].size[1] = face->glyph->bitmap.rows;
             characters[ch].bearing[0] = face->glyph->bitmap_left;
@@ -159,7 +159,7 @@ public:
 
             device.bindTexture(program, ch.texture, "in_Sampler", 0);
 
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id);
             check_error(__FILE__, __LINE__);
 
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);

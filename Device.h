@@ -10,26 +10,38 @@ struct Sampler {
 };
 
 struct Texture2D {
-    GLuint texId;
+    GLuint id;
+};
+
+struct DepthStencilTexture {
+    GLuint id;
 };
 
 struct VertexBuffer {
-    GLuint vbo;
+    GLuint id;
 };
 
 struct IndexBuffer {
-    GLuint ibo;
+    GLuint id;
 };
 
 struct ConstantBuffer {
-    GLuint cbo;
+    GLuint id;
 };
 
 struct VertexArray {
-    GLuint vao;
+    GLuint id;
 };
 
 struct Program {
+    GLuint id;
+};
+
+struct Framebuffer {
+    GLuint id;
+};
+
+struct Renderbuffer {
     GLuint id;
 };
 
@@ -100,6 +112,11 @@ public:
         return {cbo};
     }
 
+    void setConstantBufferBinding(Program program, const char* blockName, int bindingPoint) {
+        int index = glGetUniformBlockIndex(program.id, blockName);
+        glUniformBlockBinding(program.id, index, bindingPoint);
+    }
+
     VertexArray createVertexArray(const VertexDeclarationDesc* vertexDeclarationDesc, int size,
                                   IndexBuffer indexBuffer) {
         GLuint vao;
@@ -110,7 +127,7 @@ public:
         glBindVertexArray(vao);
         check_error(__FILE__, __LINE__);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.ibo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.id);
         check_error(__FILE__, __LINE__);
 
         for (int i = 0; i < size; i++) {
@@ -119,7 +136,7 @@ public:
             void* offset = vertexDeclarationDesc[i].offset;
             VertexBuffer vertexBuffer = vertexDeclarationDesc[i].buffer;
 
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id);
             check_error(__FILE__, __LINE__);
 
             glVertexAttribPointer(i, format[0], format[1], GL_FALSE, stride, offset);
@@ -158,6 +175,18 @@ public:
 
         GLfloat color[] = {1.0f, 1.0f, 1.0f, 1.0f};
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        return {texId};
+    }
+
+    DepthStencilTexture createDepthStencilTexture(int width, int height) {
+        GLuint texId;
+        glGenTextures(1, &texId);
+
+        glBindTexture(GL_TEXTURE_2D, texId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0,
+                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
         glBindTexture(GL_TEXTURE_2D, 0);
 
         return {texId};
@@ -223,8 +252,63 @@ public:
         return {program};
     }
 
+    Framebuffer createFramebuffer() {
+        GLuint id;
+
+        glGenFramebuffers(1, &id);
+        //glBindFramebuffer(GL_FRAMEBUFFER, id);
+
+        return {id};
+    }
+
+    void bindTextureToFramebuffer(Framebuffer framebuffer, Texture2D texture, int index) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, texture.id, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    void bindDepthStencilTextureToFramebuffer(Framebuffer framebuffer, DepthStencilTexture texture) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture.id, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    Renderbuffer createRenderbuffer(int width, int height) {
+        GLuint id;
+
+        glGenRenderbuffers(1, &id);
+        glBindRenderbuffer(GL_RENDERBUFFER, id);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+        return {id};
+    }
+
+    void bindRenderbufferToFramebuffer(Framebuffer framebuffer, Renderbuffer renderbuffer) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+
+    void bindFramebuffer(Framebuffer framebuffer) {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.id);
+        check_error(__FILE__, __LINE__);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id);
+        check_error(__FILE__, __LINE__);
+    }
+
+    void bindReadFramebuffer(Framebuffer framebuffer) {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.id);
+        check_error(__FILE__, __LINE__);
+    }
+
+    void bindDrawFramebuffer(Framebuffer framebuffer) {
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id);
+        check_error(__FILE__, __LINE__);
+    }
+
     void bindVertexArray(VertexArray vertexArray) {
-        glBindVertexArray(vertexArray.vao);
+        glBindVertexArray(vertexArray.id);
         check_error(__FILE__, __LINE__);
     }
 
@@ -233,8 +317,8 @@ public:
         check_error(__FILE__, __LINE__);
     }
 
-    void copyConstantBuffer(Program program, ConstantBuffer constantBuffer, const void* data, size_t size) {
-        glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.cbo);
+    void copyConstantBuffer(ConstantBuffer constantBuffer, const void* data, size_t size) {
+        glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.id);
         check_error(__FILE__, __LINE__);
 
         void* buffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
@@ -254,21 +338,7 @@ public:
             glUniform1i(index, unit);
             check_error(__FILE__, __LINE__);
 
-            glBindTexture(GL_TEXTURE_2D, texture.texId);
-            check_error(__FILE__, __LINE__);
-        }
-    }
-
-    void setMatrix(Program program, const char* name, float rotation) {
-        float matrix[9] = {
-                1, 0, 0,
-                0, 1, 0,
-                0, 0, 1,
-        };
-
-        int index = glGetUniformLocation(program.id, name);
-        if (index != -1) {
-            glUniformMatrix3fv(index, 1, 0, matrix);
+            glBindTexture(GL_TEXTURE_2D, texture.id);
             check_error(__FILE__, __LINE__);
         }
     }
@@ -277,14 +347,6 @@ public:
         int index = glGetUniformLocation(program.id, name);
         if (index != -1) {
             glUniform3f(index, x, y, z);
-            check_error(__FILE__, __LINE__);
-        }
-    }
-
-    void setValue(Program program, const char* name, float* value) {
-        int index = glGetUniformLocation(program.id, name);
-        if (index != -1) {
-            glUniform4fv(index, 1, value);
             check_error(__FILE__, __LINE__);
         }
     }
@@ -298,6 +360,13 @@ public:
         void* _offset = (void*) (offset * sizeof(uint16_t));
 
         glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset);
+        check_error(__FILE__, __LINE__);
+    }
+
+    void drawTrianglesInstanced(int offset, int count, int instance) {
+        void* _offset = (void*) (offset * sizeof(uint16_t));
+
+        glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset, instance);
         check_error(__FILE__, __LINE__);
     }
 };
