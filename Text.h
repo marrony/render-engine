@@ -6,7 +6,7 @@
 #define TEXT_H
 
 const char* vertexFontSource = STR(
-        layout (location = 0) in vec4 in_Vertex;
+        layout(location = 0) in vec4 in_Vertex;
 
         out vec2 var_Texture;
 
@@ -88,7 +88,7 @@ public:
 
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-        vertexBuffer = device.createVertexBuffer(sizeof(float)*6*4, nullptr);
+        vertexBuffer = device.createVertexBuffer(sizeof(float) * 6 * 4, nullptr);
 
         VertexDeclarationDesc vertexDeclaration[1] = {};
         vertexDeclaration[0].buffer = vertexBuffer;
@@ -115,11 +115,16 @@ public:
         device.setValue(program, "in_Color", 1, 0, 0);
         device.bindVertexArray(vertexArray);
 
-        GLfloat viewport[4];
-        glGetFloatv(GL_VIEWPORT, viewport);
+        int width = 0;
+        int height = 0;
+        GLFWwindow* window = glfwGetCurrentContext();
+        glfwGetFramebufferSize(window, &width, &height);
 
-        float invw = 1.0f / viewport[2];
-        float invh = 1.0f / viewport[3];
+        GLfloat viewport[4];
+        glViewport(0, 0, width, height);
+
+        float invw = 1.0f / width;
+        float invh = 1.0f / height;
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -128,7 +133,7 @@ public:
         device.bindSampler(sampler, 0);
 
         float scale = 1.0;
-        for(size_t i = 0; i < size; i++) {
+        for (size_t i = 0; i < size; i++) {
             Character& ch = characters[text[i]];
 
             GLfloat xpos = x + ch.bearing[0] * scale;
@@ -138,16 +143,16 @@ public:
             GLfloat h = ch.size[1] * scale;
 
             GLfloat vertices[6][4] = {
-                    { xpos,     ypos + h,   0.0, 0.0 },
-                    { xpos,     ypos,       0.0, 1.0 },
-                    { xpos + w, ypos,       1.0, 1.0 },
+                    {xpos,     ypos + h, 0.0, 0.0},
+                    {xpos,     ypos,     0.0, 1.0},
+                    {xpos + w, ypos,     1.0, 1.0},
 
-                    { xpos,     ypos + h,   0.0, 0.0 },
-                    { xpos + w, ypos,       1.0, 1.0 },
-                    { xpos + w, ypos + h,   1.0, 0.0 }
+                    {xpos,     ypos + h, 0.0, 0.0},
+                    {xpos + w, ypos,     1.0, 1.0},
+                    {xpos + w, ypos + h, 1.0, 0.0}
             };
 
-            for(int i = 0; i < 6; i++) {
+            for (int i = 0; i < 6; i++) {
                 vertices[i][0] = (vertices[i][0] * invw * 2.0f) - 1.0f;
                 vertices[i][1] = (vertices[i][1] * invh * 2.0f) - 1.0f;
             }

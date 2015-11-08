@@ -9,9 +9,15 @@ class RenderQueue {
 public:
     RenderQueue(Device& device) : device(device), itemsCount(0) { }
 
+    void submit(StCommand* cmd) {
+        items[itemsCount].cmd = cmd;
+        items[itemsCount].count = 0;
+        itemsCount++;
+    }
+
     void submit(StDrawCommand* draw, State** states, int count) {
-        items[itemsCount].draw = draw;
-        for(int i = 0; i < count; i++)
+        items[itemsCount].cmd = &draw->command;
+        for (int i = 0; i < count; i++)
             items[itemsCount].states[i] = states[i];
         items[itemsCount].count = count;
         itemsCount++;
@@ -24,19 +30,19 @@ public:
         memset(previousState, 0, sizeof(previousState));
         memset(nonDefaultState, 0xff, sizeof(nonDefaultState));
 
-        numberCommands = 0;
+        executedCommands = 0;
         skippedCommands = 0;
 
-        for(int i = 0; i < itemsCount; i++) {
+        for (int i = 0; i < itemsCount; i++) {
             Item& item = items[i];
 
             bool statesSet[COMMAND_MAX];
             memset(statesSet, 0, sizeof(statesSet));
 
-            for(int j = 0; j < item.count; j++) {
+            for (int j = 0; j < item.count; j++) {
                 State* state = item.states[j];
 
-                for(int k = 0; k < state->commandCount; k++) {
+                for (int k = 0; k < state->commandCount; k++) {
                     StStateCommand* stateCmd = state->commands[k];
 
                     extern int sizeCommand[];
@@ -45,8 +51,8 @@ public:
 
                     int size = sizeCommand[id];
 
-                    if(!statesSet[id] && (!previousState[id] || memcmp(previousState[id], stateCmd, size) != 0)) {
-                        submit(&stateCmd->command);
+                    if (!statesSet[id] && (!previousState[id] || memcmp(previousState[id], stateCmd, size) != 0)) {
+                        execute(&stateCmd->command);
                         statesSet[id] = true;
                         previousState[id] = stateCmd;
                     } else {
@@ -55,7 +61,7 @@ public:
                 }
             }
 
-            submit(&item.draw->command);
+            execute(item.cmd);
         }
 
         itemsCount = 0;
@@ -65,19 +71,20 @@ public:
         return skippedCommands;
     }
 
-    int getNumberCommands() {
-        return numberCommands;
+    int getExecutedCommands() {
+        return executedCommands;
     }
+
 private:
-    void submit(StCommand* cmd) {
+    void execute(StCommand* cmd) {
         extern FnSubmitCommand submitCommand[];
 
-        numberCommands++;
+        executedCommands++;
         submitCommand[cmd->id](device, cmd);
     }
 
     struct Item {
-        StDrawCommand* draw;
+        StCommand* cmd;
         State* states[8];
         int count;
     };
@@ -85,7 +92,7 @@ private:
     Device& device;
     int itemsCount;
     Item items[100];
-    int numberCommands;
+    int executedCommands;
     int skippedCommands;
 
     StStateCommand* defaults[COMMAND_MAX];

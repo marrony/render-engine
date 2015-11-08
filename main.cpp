@@ -5,6 +5,7 @@
 #include <memory.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -12,7 +13,7 @@
 #define STR(x) #x
 
 void check_error(const char* file, int line) {
-    if(glGetError() != GL_NO_ERROR) {
+    if (glGetError() != GL_NO_ERROR) {
         printf("glError() = %s:%d\n", file, line);
         exit(-1);
     }
@@ -20,10 +21,10 @@ void check_error(const char* file, int line) {
 
 class Allocator {
 public:
-    Allocator(uint8_t *begin, size_t size) : begin(begin), end(begin+size), current(begin) { }
+    Allocator(uint8_t* begin, size_t size) : begin(begin), end(begin + size), current(begin) { }
 
     void* allocate(size_t size) {
-        if(current+size > end)
+        if (current + size > end)
             return nullptr;
 
         void* data = current;
@@ -34,10 +35,11 @@ public:
     size_t memoryUsed() {
         return current - begin;
     }
+
 private:
-    uint8_t *begin;
-    uint8_t *end;
-    uint8_t *current;
+    uint8_t* begin;
+    uint8_t* end;
+    uint8_t* current;
 };
 
 #include "Device.h"
@@ -50,7 +52,7 @@ struct Mesh {
     StDrawCommand* draw;
 
     static Mesh* create(Allocator& allocator, int offset, int count) {
-        Mesh* mesh = (Mesh *) allocator.allocate(sizeof(Mesh));
+        Mesh* mesh = (Mesh*) allocator.allocate(sizeof(Mesh));
 
         mesh->state = State::create(allocator, 0);
         mesh->draw = DrawTriangles::create(allocator, offset, count);
@@ -65,7 +67,7 @@ struct Model {
     Mesh* meshes[];
 
     static Model* create(Allocator& allocator, VertexArray vertexArray, int meshCount) {
-        Model* model = (Model *) allocator.allocate(sizeof(Model) + meshCount*sizeof(Mesh*));
+        Model* model = (Model*) allocator.allocate(sizeof(Model) + meshCount * sizeof(Mesh*));
 
         model->state = State::create(allocator, 1);
         model->state->commands[0] = BindVertexArray::create(allocator, vertexArray);
@@ -77,19 +79,15 @@ struct Model {
 
 struct Material {
     State* state;
-    float color[4];
-    float angle;
 
+    static Material* create(Allocator& allocator, Program program, Texture2D texture, Sampler sampler, ConstantBuffer constantBuffer, const void* data, size_t size) {
+        Material* material = (Material*) allocator.allocate(sizeof(Material));
 
-    static Material* create(Allocator& allocator, Program program, Texture2D texture, Sampler sampler) {
-        Material* material = (Material *)allocator.allocate(sizeof(Material));
-
-        material->state = State::create(allocator, 5);
+        material->state = State::create(allocator, 4);
         material->state->commands[0] = BindProgram::create(allocator, program);
         material->state->commands[1] = BindTexture::create(allocator, program, "in_Sampler", texture, 0);
         material->state->commands[2] = BindSampler::create(allocator, program, sampler, 0);
-        material->state->commands[3] = BindConstant4::create(allocator, program, "in_Color2", material->color);
-        material->state->commands[4] = BindMatrix3::create(allocator, program, "in_Rotation", &material->angle);
+        material->state->commands[3] = CopyConstantBuffer::create(allocator, program, constantBuffer, data, size);
 
         return material;
     }
@@ -101,15 +99,15 @@ struct ModelInstance {
     Material* materials[];
 
     void draw(RenderQueue& renderQueue) {
-        for(int i = 0; i < model->meshCount; i++) {
+        for (int i = 0; i < model->meshCount; i++) {
             Mesh* mesh = model->meshes[i];
             Material* material = materials[i];
 
             State* states[] = {
-                state,
-                model->state,
-                material->state,
-                mesh->state,
+                    state,
+                    model->state,
+                    material->state,
+                    mesh->state,
             };
 
             renderQueue.submit(mesh->draw, states, 4);
@@ -117,8 +115,8 @@ struct ModelInstance {
     }
 
     static ModelInstance* create(Allocator& allocator, Model* model) {
-        size_t nbytes = sizeof(ModelInstance) + model->meshCount*sizeof(Material*);
-        ModelInstance* modelInstance = (ModelInstance *) allocator.allocate(nbytes);
+        size_t nbytes = sizeof(ModelInstance) + model->meshCount * sizeof(Material*);
+        ModelInstance* modelInstance = (ModelInstance*) allocator.allocate(nbytes);
 
         modelInstance->state = State::create(allocator, 0);
         modelInstance->model = model;
@@ -132,12 +130,19 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
+void framebuffer_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+}
+
 const char* vertexSource = STR(
         layout(location = 0) in vec3 in_Position;
         layout(location = 1) in vec2 in_Texture;
         layout(location = 2) in vec3 in_Color;
 
-        uniform mat3 in_Rotation;
+        layout(std140) uniform in_ShaderData {
+            uniform mat3 in_Rotation;
+            uniform vec4 in_Color2;
+        };
 
         out vec2 var_Texture;
         out vec4 var_Color;
@@ -153,8 +158,12 @@ const char* fragmentSource = STR(
         in vec2 var_Texture;
         in vec4 var_Color;
 
+        layout(std140) uniform in_ShaderData {
+            uniform mat3 in_Rotation;
+            uniform vec4 in_Color2;
+        };
+
         uniform sampler2D in_Sampler;
-        uniform vec4 in_Color2;
 
         out vec4 out_FragColor;
 
@@ -167,7 +176,7 @@ int main(int argc, char* argv[]) {
     char buffer[1000];
     getcwd(buffer, 1000);
 
-    if(!glfwInit())
+    if (!glfwInit())
         return -1;
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -177,21 +186,24 @@ int main(int argc, char* argv[]) {
 
     GLFWwindow* window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
 
-    if(!window) {
+    if (!window) {
         glfwTerminate();
         return -1;
     }
 
     glfwSetKeyCallback(window, key_callback);
+    glfwSetFramebufferSizeCallback(window, framebuffer_callback);
 
     glfwMakeContextCurrent(window);
 
-    if(gl3wInit()) {
+    glfwSwapInterval(0);
+
+    if (gl3wInit()) {
         return -1;
     }
 
-    const size_t size = 1024*1024;
-    uint8_t *data = new uint8_t[size];
+    const size_t size = 1024 * 1024;
+    uint8_t* data = new uint8_t[size];
     Allocator allocator(data, size);
 
     Device device;
@@ -201,10 +213,26 @@ int main(int argc, char* argv[]) {
 
     Program program = device.createProgram(vertexSource, fragmentSource);
 
-    uint32_t black = 0xff000000;
-    uint32_t white = 0xffffffff;
+    struct {
+        float in_Rotation[12];
+        float in_Color2[4];
+    } in_vertexData = {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            1, 1, 1, 1
+    };
 
-    uint32_t pixels0[] = {
+    int bindingPoint = 0;
+    int index = glGetUniformBlockIndex(program.id, "in_ShaderData");
+    glUniformBlockBinding(program.id, index, bindingPoint);
+
+    ConstantBuffer constantBuffer = device.createConstantBuffer(sizeof(in_vertexData), &in_vertexData, bindingPoint);
+
+    const uint32_t black = 0xff000000;
+    const uint32_t white = 0xffffffff;
+
+    const uint32_t pixels0[] = {
             black, white, black, white,
             white, black, white, black,
             black, white, black, white,
@@ -212,13 +240,9 @@ int main(int argc, char* argv[]) {
     };
     Texture2D texture0 = device.createTexture(4, 4, pixels0);
     Sampler sampler0 = device.createSampler(GL_NEAREST);
-    Material* material0 = Material::create(allocator, program, texture0, sampler0);
-    material0->color[0] = 1;
-    material0->color[1] = 1;
-    material0->color[2] = 1;
-    material0->color[3] = 1;
+    Material* material0 = Material::create(allocator, program, texture0, sampler0, constantBuffer, &in_vertexData, sizeof(in_vertexData));
 
-    uint32_t pixels1[] = {
+    const uint32_t pixels1[] = {
             black, white, black, white, black, white, black, white,
             white, black, white, black, white, black, white, black,
             black, white, black, white, black, white, black, white,
@@ -230,11 +254,7 @@ int main(int argc, char* argv[]) {
     };
     Texture2D texture1 = device.createTexture(8, 8, pixels1);
     Sampler sampler1 = device.createSampler(GL_LINEAR);
-    Material* material1 = Material::create(allocator, program, texture1, sampler1);
-    material1->color[0] = 1;
-    material1->color[1] = 1;
-    material1->color[2] = 1;
-    material1->color[3] = 1;
+    Material* material1 = Material::create(allocator, program, texture1, sampler1, constantBuffer, &in_vertexData, sizeof(in_vertexData));
 
     float vertexData[] = {
             -0.5, -0.5, 0.0,
@@ -261,7 +281,7 @@ int main(int argc, char* argv[]) {
     VertexBuffer colorBuffer = device.createVertexBuffer(sizeof(colorData), colorData);
     IndexBuffer indexBuffer = device.createIndexBuffer(sizeof(indexData), indexData);
 
-    VertexDeclarationDesc vertexDeclaration[3] = { };
+    VertexDeclarationDesc vertexDeclaration[3] = {};
     vertexDeclaration[0].buffer = vertexBuffer;
     vertexDeclaration[0].format = VertexFloat3;
     vertexDeclaration[0].offset = 0;
@@ -291,19 +311,66 @@ int main(int argc, char* argv[]) {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    RenderQueue renderQueue(device);
-    while (!glfwWindowShouldClose(window)) {
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
+    StStateCommand* setViewport0 = SetViewport::create(allocator, 0.5, 0.5, 1.0, 1.0);
+    StStateCommand* setViewport1 = SetViewport::create(allocator, 0.0, 0.0, 0.5, 0.5);
+    StStateCommand* setViewport2 = SetViewport::create(allocator, 0.0, 0.5, 0.5, 1.0);
+    StStateCommand* setViewport3 = SetViewport::create(allocator, 0.5, 0.0, 1.0, 0.5);
+    StStateCommand* setViewport4 = SetViewport::create(allocator, 0.25, 0.25, 0.75, 0.75);
+    StStateCommand* setViewport5 = SetViewport::create(allocator, 0, 0, 1, 1);
 
+    StStateCommand* clearColor = ClearColor::create(allocator, 0.15, 0.15, 0.15, 1);
+    StStateCommand* clearColor2 = ClearColor::create(allocator, 0, 1, 0.15, 1);
+
+    RenderQueue renderQueue(device);
+
+    float angle = 0;
+    while (!glfwWindowShouldClose(window)) {
+        float cos = cosf(angle);
+        float sin = sinf(angle);
+
+        angle += 0.005;
+
+        in_vertexData.in_Rotation[0] = cos;
+        in_vertexData.in_Rotation[1] = -sin;
+        in_vertexData.in_Rotation[4] = sin;
+        in_vertexData.in_Rotation[5] = cos;
+
+        in_vertexData.in_Color2[0] -= 0.00001;
+        in_vertexData.in_Color2[1] -= 0.00002;
+        in_vertexData.in_Color2[2] -= 0.00003;
+
+        renderQueue.submit(&setViewport0->command);
+        renderQueue.submit(&clearColor->command);
+        modelInstance0->draw(renderQueue);
+
+        renderQueue.submit(&setViewport1->command);
+        renderQueue.submit(&clearColor->command);
+        modelInstance1->draw(renderQueue);
+
+        renderQueue.submit(&setViewport2->command);
+        renderQueue.submit(&clearColor->command);
+        modelInstance1->draw(renderQueue);
+
+        renderQueue.submit(&setViewport3->command);
+        renderQueue.submit(&clearColor->command);
+        modelInstance0->draw(renderQueue);
+
+        renderQueue.submit(&setViewport4->command);
+        renderQueue.submit(&clearColor2->command);
         modelInstance0->draw(renderQueue);
         modelInstance1->draw(renderQueue);
+
+        renderQueue.submit(&setViewport5->command);
+
         renderQueue.submit();
 
         fontItalic.printText(10, 180, "My font example");
         fontRegular.printText(10, 130, "Memory used %ld bytes", allocator.memoryUsed());
-        fontRegular.printText(10, 80, "Number of commands %d", renderQueue.getNumberCommands());
-        fontRegular.printText(10, 30, "Skipped commands %d", renderQueue.getSkippedCommands());
+        float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
+        fontRegular.printText(10, 80, "Executed commands %d | %.2f%% executed",
+                              renderQueue.getExecutedCommands(), renderQueue.getExecutedCommands() / totalCommands * 100);
+        fontRegular.printText(10, 30, "Skipped commands %d | %.2f%% ignored",
+                              renderQueue.getSkippedCommands(), renderQueue.getSkippedCommands() / totalCommands * 100);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

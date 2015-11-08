@@ -21,6 +21,10 @@ struct IndexBuffer {
     GLuint ibo;
 };
 
+struct ConstantBuffer {
+    GLuint cbo;
+};
+
 struct VertexArray {
     GLuint vao;
 };
@@ -53,7 +57,10 @@ public:
         glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
         check_error(__FILE__, __LINE__);
 
-        return { vbo };
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        check_error(__FILE__, __LINE__);
+
+        return {vbo};
     }
 
     IndexBuffer createIndexBuffer(size_t size, const void* data) {
@@ -67,10 +74,34 @@ public:
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
         check_error(__FILE__, __LINE__);
 
-        return { ibo };
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        check_error(__FILE__, __LINE__);
+
+        return {ibo};
     }
 
-    VertexArray createVertexArray(const VertexDeclarationDesc* vertexDeclarationDesc, int size, IndexBuffer indexBuffer) {
+    ConstantBuffer createConstantBuffer(size_t size, const void* data, int bindingPoint) {
+        GLuint cbo;
+
+        glGenBuffers(1, &cbo);
+        check_error(__FILE__, __LINE__);
+
+        glBindBuffer(GL_UNIFORM_BUFFER, cbo);
+        check_error(__FILE__, __LINE__);
+        glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW);
+        check_error(__FILE__, __LINE__);
+
+        glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, cbo);
+        check_error(__FILE__, __LINE__);
+
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        check_error(__FILE__, __LINE__);
+
+        return {cbo};
+    }
+
+    VertexArray createVertexArray(const VertexDeclarationDesc* vertexDeclarationDesc, int size,
+                                  IndexBuffer indexBuffer) {
         GLuint vao;
 
         glGenVertexArrays(1, &vao);
@@ -82,7 +113,7 @@ public:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.ibo);
         check_error(__FILE__, __LINE__);
 
-        for(int i = 0; i < size; i++) {
+        for (int i = 0; i < size; i++) {
             uint32_t* format = vertexDeclarationDesc[i].format;
             uint32_t stride = vertexDeclarationDesc[i].stride;
             void* offset = vertexDeclarationDesc[i].offset;
@@ -99,7 +130,7 @@ public:
 
         glBindVertexArray(0);
 
-        return { vao };
+        return {vao};
     }
 
     Sampler createSampler(int type) {
@@ -111,10 +142,10 @@ public:
         glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, type);
         glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, type);
 
-        return { sampler };
+        return {sampler};
     }
 
-    Texture2D createTexture(int width, int height, void* pixels) {
+    Texture2D createTexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId);
 
@@ -125,11 +156,11 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-        GLfloat color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        GLfloat color[] = {1.0f, 1.0f, 1.0f, 1.0f};
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        return { texId };
+        return {texId};
     }
 
     Program createProgram(const char* vertexSource, const char* fragmentSource) {
@@ -146,7 +177,7 @@ public:
         glCompileShader(vertexShader);
         check_error(__FILE__, __LINE__);
         glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
-        if(!status) {
+        if (!status) {
             char info[1024];
 
             glGetShaderInfoLog(vertexShader, 1024, nullptr, info);
@@ -165,7 +196,7 @@ public:
         glCompileShader(fragmentShader);
         check_error(__FILE__, __LINE__);
         glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
-        if(!status) {
+        if (!status) {
             char info[1024];
 
             glGetShaderInfoLog(fragmentShader, 1024, nullptr, info);
@@ -181,7 +212,7 @@ public:
         check_error(__FILE__, __LINE__);
         glLinkProgram(program);
         glGetProgramiv(program, GL_LINK_STATUS, &status);
-        if(!status) {
+        if (!status) {
             char info[1024];
 
             glGetProgramInfoLog(program, 1024, nullptr, info);
@@ -189,7 +220,7 @@ public:
             exit(-1);
         }
 
-        return { program };
+        return {program};
     }
 
     void bindVertexArray(VertexArray vertexArray) {
@@ -202,11 +233,24 @@ public:
         check_error(__FILE__, __LINE__);
     }
 
+    void copyConstantBuffer(Program program, ConstantBuffer constantBuffer, const void* data, size_t size) {
+        glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.cbo);
+        check_error(__FILE__, __LINE__);
+
+        void* buffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
+        check_error(__FILE__, __LINE__);
+
+        memcpy(buffer, data, size);
+
+        glUnmapBuffer(GL_UNIFORM_BUFFER);
+        check_error(__FILE__, __LINE__);
+    }
+
     void bindTexture(Program program, Texture2D texture, const char* name, int unit) {
         glActiveTexture(GL_TEXTURE0 + unit);
 
         int index = glGetUniformLocation(program.id, name);
-        if(index != -1) {
+        if (index != -1) {
             glUniform1i(index, unit);
             check_error(__FILE__, __LINE__);
 
@@ -223,7 +267,7 @@ public:
         };
 
         int index = glGetUniformLocation(program.id, name);
-        if(index != -1) {
+        if (index != -1) {
             glUniformMatrix3fv(index, 1, 0, matrix);
             check_error(__FILE__, __LINE__);
         }
@@ -231,7 +275,7 @@ public:
 
     void setValue(Program program, const char* name, float x, float y, float z) {
         int index = glGetUniformLocation(program.id, name);
-        if(index != -1) {
+        if (index != -1) {
             glUniform3f(index, x, y, z);
             check_error(__FILE__, __LINE__);
         }
@@ -239,7 +283,7 @@ public:
 
     void setValue(Program program, const char* name, float* value) {
         int index = glGetUniformLocation(program.id, name);
-        if(index != -1) {
+        if (index != -1) {
             glUniform4fv(index, 1, value);
             check_error(__FILE__, __LINE__);
         }
@@ -251,7 +295,7 @@ public:
     }
 
     void drawTriangles(int offset, int count) {
-        void* _offset = (void*)(offset*sizeof(uint16_t));
+        void* _offset = (void*) (offset * sizeof(uint16_t));
 
         glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset);
         check_error(__FILE__, __LINE__);
