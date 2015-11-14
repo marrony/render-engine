@@ -58,7 +58,24 @@ struct VertexDeclarationDesc {
 
 class Device {
 public:
-    VertexBuffer createVertexBuffer(size_t size, const void* data) {
+    VertexBuffer createDynamicVertexBuffer(size_t size, const void* data) {
+        GLuint vbo;
+
+        glGenBuffers(1, &vbo);
+        check_error(__FILE__, __LINE__);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        check_error(__FILE__, __LINE__);
+        glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
+        check_error(__FILE__, __LINE__);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        check_error(__FILE__, __LINE__);
+
+        return {vbo};
+    }
+
+    VertexBuffer createStaticVertexBuffer(size_t size, const void* data) {
         GLuint vbo;
 
         glGenBuffers(1, &vbo);
@@ -162,6 +179,36 @@ public:
         return {sampler};
     }
 
+    Texture2D createFloat16Texture(int width, int height, const void* pixels) {
+        GLuint texId;
+        glGenTextures(1, &texId);
+
+        glBindTexture(GL_TEXTURE_2D, texId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, pixels);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        return {texId};
+    }
+
+    Texture2D createFloat32Texture(int width, int height, const void* pixels) {
+        GLuint texId;
+        glGenTextures(1, &texId);
+
+        glBindTexture(GL_TEXTURE_2D, texId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, pixels);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        return {texId};
+    }
+
     Texture2D createTexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId);
@@ -192,8 +239,31 @@ public:
         return {texId};
     }
 
-    Program createProgram(const char* vertexSource, const char* fragmentSource) {
+    Program createProgram(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
         GLint status;
+
+        const char* geometrySource2[] = {
+                "#version 410 core\n", geometrySource
+        };
+
+        GLuint geometryShader = 0;
+
+        if(geometrySource != nullptr) {
+            geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
+            check_error(__FILE__, __LINE__);
+            glShaderSource(geometryShader, 2, geometrySource2, nullptr);
+            check_error(__FILE__, __LINE__);
+            glCompileShader(geometryShader);
+            check_error(__FILE__, __LINE__);
+            glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &status);
+            if (!status) {
+                char info[1024];
+
+                glGetShaderInfoLog(geometryShader, 1024, nullptr, info);
+                printf("vertexShader: %s\n", info);
+                exit(-1);
+            }
+        }
 
         const char* vertexSource2[] = {
                 "#version 410 core\n", vertexSource
@@ -239,6 +309,10 @@ public:
         check_error(__FILE__, __LINE__);
         glAttachShader(program, fragmentShader);
         check_error(__FILE__, __LINE__);
+        if(geometryShader != 0) {
+            glAttachShader(program, geometryShader);
+            check_error(__FILE__, __LINE__);
+        }
         glLinkProgram(program);
         glGetProgramiv(program, GL_LINK_STATUS, &status);
         if (!status) {
@@ -307,6 +381,28 @@ public:
         check_error(__FILE__, __LINE__);
     }
 
+    void setRenderTarget(Framebuffer framebuffer, int targets[], int count) {
+        GLenum _targets[GL_COLOR_ATTACHMENT31 - GL_COLOR_ATTACHMENT0] = { };
+
+        for(int i = 0; i < count; i++)
+            _targets[i] = GL_COLOR_ATTACHMENT0 + targets[i];
+
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id);
+        glDrawBuffers(count, _targets);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    }
+
+
+    bool isFramebufferComplete(Framebuffer framebuffer) {
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
+
+        GLint status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        return status == GL_FRAMEBUFFER_COMPLETE;
+    }
+
     void bindVertexArray(VertexArray vertexArray) {
         glBindVertexArray(vertexArray.id);
         check_error(__FILE__, __LINE__);
@@ -315,6 +411,10 @@ public:
     void bindProgram(Program program) {
         glUseProgram(program.id);
         check_error(__FILE__, __LINE__);
+    }
+
+    int getUniformLocation(Program program, const char* name) {
+        return glGetUniformLocation(program.id, name);
     }
 
     void copyConstantBuffer(ConstantBuffer constantBuffer, const void* data, size_t size) {
@@ -330,17 +430,13 @@ public:
         check_error(__FILE__, __LINE__);
     }
 
-    void bindTexture(Program program, Texture2D texture, const char* name, int unit) {
-        glActiveTexture(GL_TEXTURE0 + unit);
+    void bindTexture(Program program, Texture2D texture, int index) {
+        glActiveTexture(GL_TEXTURE0 + index);
+        glUniform1i(index, index);
+        check_error(__FILE__, __LINE__);
 
-        int index = glGetUniformLocation(program.id, name);
-        if (index != -1) {
-            glUniform1i(index, unit);
-            check_error(__FILE__, __LINE__);
-
-            glBindTexture(GL_TEXTURE_2D, texture.id);
-            check_error(__FILE__, __LINE__);
-        }
+        glBindTexture(GL_TEXTURE_2D, texture.id);
+        check_error(__FILE__, __LINE__);
     }
 
     void setValue(Program program, const char* name, float x, float y, float z) {

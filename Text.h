@@ -88,7 +88,7 @@ public:
 
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-        vertexBuffer = device.createVertexBuffer(sizeof(float) * 6 * 4, nullptr);
+        vertexBuffer = device.createDynamicVertexBuffer(sizeof(float) * 4 * 4, nullptr);
 
         VertexDeclarationDesc vertexDeclaration[1] = {};
         vertexDeclaration[0].buffer = vertexBuffer;
@@ -132,6 +132,8 @@ public:
         Sampler sampler = {0};
         device.bindSampler(sampler, 0);
 
+        int in_Sampler = device.getUniformLocation(program, "in_Sampler");
+
         float scale = 1.0;
         for (size_t i = 0; i < size; i++) {
             Character& ch = characters[text[i]];
@@ -142,14 +144,12 @@ public:
             GLfloat w = ch.size[0] * scale;
             GLfloat h = ch.size[1] * scale;
 
-            GLfloat vertices[6][4] = {
+            GLfloat vertices[4][4] = {
                     {xpos,     ypos + h, 0.0, 0.0},
                     {xpos,     ypos,     0.0, 1.0},
-                    {xpos + w, ypos,     1.0, 1.0},
 
-                    {xpos,     ypos + h, 0.0, 0.0},
+                    {xpos + w, ypos + h, 1.0, 0.0},
                     {xpos + w, ypos,     1.0, 1.0},
-                    {xpos + w, ypos + h, 1.0, 0.0}
             };
 
             for (int i = 0; i < 6; i++) {
@@ -157,7 +157,7 @@ public:
                 vertices[i][1] = (vertices[i][1] * invh * 2.0f) - 1.0f;
             }
 
-            device.bindTexture(program, ch.texture, "in_Sampler", 0);
+            device.bindTexture(program, ch.texture, in_Sampler);
 
             glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id);
             check_error(__FILE__, __LINE__);
@@ -168,7 +168,7 @@ public:
             glBindBuffer(GL_ARRAY_BUFFER, 0);
             check_error(__FILE__, __LINE__);
 
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
             check_error(__FILE__, __LINE__);
 
             x += ch.advance * scale;

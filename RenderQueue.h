@@ -5,25 +5,42 @@
 #ifndef RENDERQUEUE_H
 #define RENDERQUEUE_H
 
+#include <algorithm>
+
+struct RenderItem {
+    uint64_t key;
+    DrawCommand* cmd;
+    int statesCount;
+    State* states[COMMAND_MAX];
+};
+
+bool operator<(const RenderItem& i0, const RenderItem& i1) {
+    return i0.key < i1.key;
+}
+
+struct RenderGroup {
+    State* state;
+    int itemsCount;
+    RenderItem* items;
+};
+
 class RenderQueue {
 public:
-    RenderQueue(Device& device) : device(device), itemsCount(0) { }
-
-    void submit(Command* cmd) {
-        items[itemsCount].cmd = cmd;
-        items[itemsCount].count = 0;
-        itemsCount++;
+    RenderQueue(Device& device) : device(device), itemsCount(0) {
+        items = new RenderItem[1024];
     }
 
-    void submit(StDrawCommand* draw, State** states, int count) {
-        items[itemsCount].cmd = &draw->command;
-        for (int i = 0; i < count; i++)
+    void submit(uint64_t key, DrawCommand* draw, State** states, int statesCount) {
+        items[itemsCount].key = key;
+        items[itemsCount].cmd = draw;
+        for (int i = 0; i < statesCount; i++)
             items[itemsCount].states[i] = states[i];
-        items[itemsCount].count = count;
+        items[itemsCount].statesCount = statesCount;
         itemsCount++;
     }
 
     void submit() {
+        bool statesSet[COMMAND_MAX];
         bool nonDefaultState[COMMAND_MAX];
         StateCommand* previousState[COMMAND_MAX];
 
@@ -33,21 +50,22 @@ public:
         executedCommands = 0;
         skippedCommands = 0;
 
-        for (int i = 0; i < itemsCount; i++) {
-            Item& item = items[i];
+        std::sort(items, items+itemsCount);
 
-            bool statesSet[COMMAND_MAX];
+        for (int i = 0; i < itemsCount; i++) {
             memset(statesSet, 0, sizeof(statesSet));
 
-            for (int j = 0; j < item.count; j++) {
+            RenderItem& item = items[i];
+
+            for (int j = 0; j < item.statesCount; j++) {
                 State* state = item.states[j];
 
                 for (int k = 0; k < state->commandCount; k++) {
                     StateCommand* stateCmd = state->commands[k];
 
-                    extern int sizeCommand[];
+                    extern const int sizeCommand[];
 
-                    uint8_t id = stateCmd->id;
+                    uint32_t id = stateCmd->id;
 
                     int size = sizeCommand[id];
 
@@ -61,7 +79,7 @@ public:
                 }
             }
 
-            execute(item.cmd);
+            execute(&item.cmd->command);
         }
 
         itemsCount = 0;
@@ -77,21 +95,15 @@ public:
 
 private:
     void execute(Command* cmd) {
-        extern FnSubmitCommand submitCommand[];
+        extern const FnSubmitCommand submitCommand[];
 
         executedCommands++;
         submitCommand[cmd->id](device, cmd);
     }
 
-    struct Item {
-        Command* cmd;
-        State* states[8];
-        int count;
-    };
-
     Device& device;
     int itemsCount;
-    Item items[100];
+    RenderItem* items;
     int executedCommands;
     int skippedCommands;
 
