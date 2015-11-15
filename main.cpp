@@ -13,11 +13,43 @@
 #define STR(x) #x
 
 void check_error(const char* file, int line) {
-    if (glGetError() != GL_NO_ERROR) {
-        printf("glError() = %s:%d\n", file, line);
-        exit(-1);
+    switch (glGetError()) {
+        case GL_NO_ERROR:
+            break;
+        case GL_INVALID_ENUM:
+            printf("glError(GL_INVALID_ENUM) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        case GL_INVALID_VALUE:
+            printf("glError(GL_INVALID_VALUE) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        case GL_INVALID_OPERATION:
+            printf("glError(GL_INVALID_OPERATION) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        case GL_INVALID_FRAMEBUFFER_OPERATION:
+            printf("glError(GL_INVALID_FRAMEBUFFER_OPERATION) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        case GL_OUT_OF_MEMORY:
+            printf("glError(GL_OUT_OF_MEMORY) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        case GL_STACK_UNDERFLOW:
+            printf("glError(GL_STACK_UNDERFLOW) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        case GL_STACK_OVERFLOW:
+            printf("glError(GL_STACK_OVERFLOW) = %s:%d\n", file, line);
+            exit(EXIT_FAILURE);
+            break;
+        default:
+            break;
     }
 }
+
+#define CHECK_ERROR check_error(__FILE__, __LINE__)
 
 #include "Allocator.h"
 #include "Device.h"

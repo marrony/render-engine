@@ -68,16 +68,12 @@ public:
     VertexBuffer createDynamicVertexBuffer(size_t size, const void* data) {
         GLuint vbo;
 
-        glGenBuffers(1, &vbo);
-        check_error(__FILE__, __LINE__);
+        glGenBuffers(1, &vbo); CHECK_ERROR;
 
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        check_error(__FILE__, __LINE__);
-        glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo); CHECK_ERROR;
+        glBufferData(GL_ARRAY_BUFFER, size, data, GL_DYNAMIC_DRAW); CHECK_ERROR;
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_ERROR;
 
         return {vbo};
     }
@@ -85,16 +81,12 @@ public:
     VertexBuffer createStaticVertexBuffer(size_t size, const void* data) {
         GLuint vbo;
 
-        glGenBuffers(1, &vbo);
-        check_error(__FILE__, __LINE__);
+        glGenBuffers(1, &vbo); CHECK_ERROR;
 
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        check_error(__FILE__, __LINE__);
-        glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo); CHECK_ERROR;
+        glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW); CHECK_ERROR;
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_ERROR;
 
         return {vbo};
     }
@@ -102,16 +94,12 @@ public:
     IndexBuffer createIndexBuffer(size_t size, const void* data) {
         GLuint ibo;
 
-        glGenBuffers(1, &ibo);
-        check_error(__FILE__, __LINE__);
+        glGenBuffers(1, &ibo); CHECK_ERROR;
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-        check_error(__FILE__, __LINE__);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo); CHECK_ERROR;
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, GL_STATIC_DRAW); CHECK_ERROR;
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_ERROR;
 
         return {ibo};
     }
@@ -119,40 +107,32 @@ public:
     ConstantBuffer createConstantBuffer(size_t size, const void* data, int bindingPoint) {
         GLuint cbo;
 
-        glGenBuffers(1, &cbo);
-        check_error(__FILE__, __LINE__);
+        glGenBuffers(1, &cbo); CHECK_ERROR;
 
-        glBindBuffer(GL_UNIFORM_BUFFER, cbo);
-        check_error(__FILE__, __LINE__);
-        glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_UNIFORM_BUFFER, cbo); CHECK_ERROR;
+        glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW); CHECK_ERROR;
 
-        glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, cbo);
-        check_error(__FILE__, __LINE__);
+        glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, cbo); CHECK_ERROR;
 
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_UNIFORM_BUFFER, 0); CHECK_ERROR;
 
         return {cbo};
     }
 
     void setConstantBufferBinding(Program program, const char* blockName, int bindingPoint) {
         int index = glGetUniformBlockIndex(program.id, blockName);
-        glUniformBlockBinding(program.id, index, bindingPoint);
+        glUniformBlockBinding(program.id, index, bindingPoint); CHECK_ERROR;
     }
 
     VertexArray createVertexArray(const VertexDeclarationDesc* vertexDeclarationDesc, int size,
                                   IndexBuffer indexBuffer) {
         GLuint vao;
 
-        glGenVertexArrays(1, &vao);
-        check_error(__FILE__, __LINE__);
+        glGenVertexArrays(1, &vao); CHECK_ERROR;
 
-        glBindVertexArray(vao);
-        check_error(__FILE__, __LINE__);
+        glBindVertexArray(vao); CHECK_ERROR;
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.id);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.id); CHECK_ERROR;
 
         for (int i = 0; i < size; i++) {
             uint32_t* format = vertexDeclarationDesc[i].format;
@@ -160,13 +140,10 @@ public:
             void* offset = vertexDeclarationDesc[i].offset;
             VertexBuffer vertexBuffer = vertexDeclarationDesc[i].buffer;
 
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id);
-            check_error(__FILE__, __LINE__);
+            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id); CHECK_ERROR;
 
-            glVertexAttribPointer(i, format[0], format[1], GL_FALSE, stride, offset);
-            check_error(__FILE__, __LINE__);
-            glEnableVertexAttribArray(i);
-            check_error(__FILE__, __LINE__);
+            glVertexAttribPointer(i, format[0], format[1], GL_FALSE, stride, offset); CHECK_ERROR;
+            glEnableVertexAttribArray(i); CHECK_ERROR;
         }
 
         glBindVertexArray(0);
@@ -177,25 +154,25 @@ public:
     Sampler createSampler(int type) {
         GLuint sampler;
 
-        glGenSamplers(1, &sampler);
-        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, type);
-        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, type);
+        glGenSamplers(1, &sampler); CHECK_ERROR;
+        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, type); CHECK_ERROR;
+        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, type); CHECK_ERROR;
 
         return {sampler};
     }
 
     Texture2D createFloat16Texture(int width, int height, const void* pixels) {
         GLuint texId;
-        glGenTextures(1, &texId);
+        glGenTextures(1, &texId); CHECK_ERROR;
 
-        glBindTexture(GL_TEXTURE_2D, texId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, pixels);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
 
         return {texId};
@@ -203,13 +180,13 @@ public:
 
     Texture2D createFloat32Texture(int width, int height, const void* pixels) {
         GLuint texId;
-        glGenTextures(1, &texId);
+        glGenTextures(1, &texId); CHECK_ERROR;
 
-        glBindTexture(GL_TEXTURE_2D, texId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, pixels);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR; CHECK_ERROR;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -218,17 +195,17 @@ public:
 
     Texture2D createTexture(int width, int height, const void* pixels) {
         GLuint texId;
-        glGenTextures(1, &texId);
+        glGenTextures(1, &texId); CHECK_ERROR;
 
-        glBindTexture(GL_TEXTURE_2D, texId);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
 
         GLfloat color[] = {1.0f, 1.0f, 1.0f, 1.0f};
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color);
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
 
         return {texId};
@@ -236,11 +213,11 @@ public:
 
     DepthStencilTexture createDepthStencilTexture(int width, int height) {
         GLuint texId;
-        glGenTextures(1, &texId);
+        glGenTextures(1, &texId); CHECK_ERROR;
 
-        glBindTexture(GL_TEXTURE_2D, texId);
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0,
-                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
+                     GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
 
         return {texId};
@@ -256,12 +233,9 @@ public:
         GLuint geometryShader = 0;
 
         if(geometrySource != nullptr) {
-            geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
-            check_error(__FILE__, __LINE__);
-            glShaderSource(geometryShader, 2, geometrySource2, nullptr);
-            check_error(__FILE__, __LINE__);
-            glCompileShader(geometryShader);
-            check_error(__FILE__, __LINE__);
+            geometryShader = glCreateShader(GL_GEOMETRY_SHADER); CHECK_ERROR;
+            glShaderSource(geometryShader, 2, geometrySource2, nullptr); CHECK_ERROR;
+            glCompileShader(geometryShader); CHECK_ERROR;
             glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &status);
             if (!status) {
                 char info[1024];
@@ -276,12 +250,9 @@ public:
                 "#version 410 core\n", vertexSource
         };
 
-        GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        check_error(__FILE__, __LINE__);
-        glShaderSource(vertexShader, 2, vertexSource2, nullptr);
-        check_error(__FILE__, __LINE__);
-        glCompileShader(vertexShader);
-        check_error(__FILE__, __LINE__);
+        GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); CHECK_ERROR;
+        glShaderSource(vertexShader, 2, vertexSource2, nullptr); CHECK_ERROR;
+        glCompileShader(vertexShader); CHECK_ERROR;
         glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
         if (!status) {
             char info[1024];
@@ -295,12 +266,9 @@ public:
                 "#version 410 core\n", fragmentSource
         };
 
-        GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        check_error(__FILE__, __LINE__);
-        glShaderSource(fragmentShader, 2, fragmentSource2, nullptr);
-        check_error(__FILE__, __LINE__);
-        glCompileShader(fragmentShader);
-        check_error(__FILE__, __LINE__);
+        GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); CHECK_ERROR;
+        glShaderSource(fragmentShader, 2, fragmentSource2, nullptr); CHECK_ERROR;
+        glCompileShader(fragmentShader); CHECK_ERROR;
         glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
         if (!status) {
             char info[1024];
@@ -310,17 +278,13 @@ public:
             exit(-1);
         }
 
-        GLuint program = glCreateProgram();
-        check_error(__FILE__, __LINE__);
-        glAttachShader(program, vertexShader);
-        check_error(__FILE__, __LINE__);
-        glAttachShader(program, fragmentShader);
-        check_error(__FILE__, __LINE__);
+        GLuint program = glCreateProgram(); CHECK_ERROR;
+        glAttachShader(program, vertexShader); CHECK_ERROR;
+        glAttachShader(program, fragmentShader); CHECK_ERROR;
         if(geometryShader != 0) {
-            glAttachShader(program, geometryShader);
-            check_error(__FILE__, __LINE__);
+            glAttachShader(program, geometryShader); CHECK_ERROR;
         }
-        glLinkProgram(program);
+        glLinkProgram(program); CHECK_ERROR;
         glGetProgramiv(program, GL_LINK_STATUS, &status);
         if (!status) {
             char info[1024];
@@ -336,56 +300,51 @@ public:
     Framebuffer createFramebuffer() {
         GLuint id;
 
-        glGenFramebuffers(1, &id);
-        //glBindFramebuffer(GL_FRAMEBUFFER, id);
+        glGenFramebuffers(1, &id); CHECK_ERROR;
 
         return {id};
     }
 
     void bindTextureToFramebuffer(Framebuffer framebuffer, Texture2D texture, int index) {
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, texture.id, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, texture.id, 0); CHECK_ERROR;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void bindDepthStencilTextureToFramebuffer(Framebuffer framebuffer, DepthStencilTexture texture) {
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture.id, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture.id, 0); CHECK_ERROR;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     Renderbuffer createRenderbuffer(int width, int height) {
         GLuint id;
 
-        glGenRenderbuffers(1, &id);
-        glBindRenderbuffer(GL_RENDERBUFFER, id);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+        glGenRenderbuffers(1, &id); CHECK_ERROR;
+        glBindRenderbuffer(GL_RENDERBUFFER, id); CHECK_ERROR;
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height); CHECK_ERROR;
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
         return {id};
     }
 
     void bindRenderbufferToFramebuffer(Framebuffer framebuffer, Renderbuffer renderbuffer) {
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer.id); CHECK_ERROR;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     void bindFramebuffer(Framebuffer framebuffer) {
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.id);
-        check_error(__FILE__, __LINE__);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id);
-        check_error(__FILE__, __LINE__);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
     }
 
     void bindReadFramebuffer(Framebuffer framebuffer) {
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.id);
-        check_error(__FILE__, __LINE__);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
     }
 
     void bindDrawFramebuffer(Framebuffer framebuffer) {
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id);
-        check_error(__FILE__, __LINE__);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
     }
 
     void setRenderTarget(Framebuffer framebuffer, int targets[], int count) {
@@ -394,8 +353,8 @@ public:
         for(int i = 0; i < count; i++)
             _targets[i] = GL_COLOR_ATTACHMENT0 + targets[i];
 
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id);
-        glDrawBuffers(count, _targets);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
+        glDrawBuffers(count, _targets); CHECK_ERROR;
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     }
 
@@ -403,7 +362,7 @@ public:
     bool isFramebufferComplete(Framebuffer framebuffer) {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
 
-        GLint status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        GLint status = glCheckFramebufferStatus(GL_FRAMEBUFFER); CHECK_ERROR;
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -411,13 +370,11 @@ public:
     }
 
     void bindVertexArray(VertexArray vertexArray) {
-        glBindVertexArray(vertexArray.id);
-        check_error(__FILE__, __LINE__);
+        glBindVertexArray(vertexArray.id); CHECK_ERROR;
     }
 
     void bindProgram(Program program) {
-        glUseProgram(program.id);
-        check_error(__FILE__, __LINE__);
+        glUseProgram(program.id); CHECK_ERROR;
     }
 
     int getUniformLocation(Program program, const char* name) {
@@ -425,52 +382,42 @@ public:
     }
 
     void copyConstantBuffer(ConstantBuffer constantBuffer, const void* data, size_t size) {
-        glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.id);
-        check_error(__FILE__, __LINE__);
+        glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.id); CHECK_ERROR;
 
-        void* buffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-        check_error(__FILE__, __LINE__);
+        void* buffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY); CHECK_ERROR;
 
         memcpy(buffer, data, size);
 
-        glUnmapBuffer(GL_UNIFORM_BUFFER);
-        check_error(__FILE__, __LINE__);
+        glUnmapBuffer(GL_UNIFORM_BUFFER); CHECK_ERROR;
     }
 
     void bindTexture(Program program, Texture2D texture, int unit) {
-        glActiveTexture(GL_TEXTURE0 + unit);
-        glUniform1i(unit, unit);
-        check_error(__FILE__, __LINE__);
-
-        glBindTexture(GL_TEXTURE_2D, texture.id);
-        check_error(__FILE__, __LINE__);
+        glActiveTexture(GL_TEXTURE0 + unit); CHECK_ERROR;
+        glUniform1i(unit, unit); CHECK_ERROR;
+        glBindTexture(GL_TEXTURE_2D, texture.id); CHECK_ERROR;
     }
 
     void setValue(Program program, const char* name, float x, float y, float z) {
         int index = glGetUniformLocation(program.id, name);
         if (index != -1) {
-            glUniform3f(index, x, y, z);
-            check_error(__FILE__, __LINE__);
+            glUniform3f(index, x, y, z); CHECK_ERROR;
         }
     }
 
     void bindSampler(Sampler sampler, int unit) {
-        glBindSampler(unit, sampler.sampler);
-        check_error(__FILE__, __LINE__);
+        glBindSampler(unit, sampler.sampler); CHECK_ERROR;
     }
 
     void drawTriangles(int offset, int count) {
         void* _offset = (void*) (offset * sizeof(uint16_t));
 
-        glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset);
-        check_error(__FILE__, __LINE__);
+        glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset); CHECK_ERROR;
     }
 
     void drawTrianglesInstanced(int offset, int count, int instance) {
         void* _offset = (void*) (offset * sizeof(uint16_t));
 
-        glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset, instance);
-        check_error(__FILE__, __LINE__);
+        glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset, instance); CHECK_ERROR;
     }
 };
 
