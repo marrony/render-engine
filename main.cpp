@@ -26,15 +26,6 @@ void check_error(const char* file, int line) {
 #include "Text.h"
 #include "Model.h"
 
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
-}
-
-void framebuffer_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
-}
-
 const char* vertexSource = STR(
         layout(location = 0) in vec3 in_Position;
         layout(location = 1) in vec3 in_Normal;
@@ -208,6 +199,29 @@ const char* quadFragmentSource = STR(
         }
 );
 
+Viewport viewport = {};
+
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GL_TRUE);
+
+    if (key == GLFW_KEY_UP /*&& action == GLFW_PRESS*/)
+        viewport.height++;
+
+    if (key == GLFW_KEY_DOWN /*&& action == GLFW_PRESS*/)
+        viewport.height--;
+
+    if (key == GLFW_KEY_RIGHT /*&& action == GLFW_PRESS*/)
+        viewport.width++;
+
+    if (key == GLFW_KEY_LEFT /*&& action == GLFW_PRESS*/)
+        viewport.width--;
+}
+
+void framebuffer_callback(GLFWwindow* window, int width, int height) {
+    glViewport(0, 0, width, height);
+}
+
 int main(int argc, char* argv[]) {
     if (!glfwInit())
         return -1;
@@ -235,9 +249,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    const size_t size = 1024 * 1024;
-    int8_t* data = new int8_t[size];
-    LinearAllocator allocator(data, size);
+    HeapAllocator heapAllocator;
 
     Device device;
 
@@ -279,7 +291,7 @@ int main(int argc, char* argv[]) {
     };
     Texture2D texture0 = device.createTexture(4, 4, pixels0);
     Sampler sampler0 = device.createSampler(GL_NEAREST);
-    Material* material0 = Material::create(allocator, program, texture0, sampler0, device.getUniformLocation(program, "in_Sampler"));
+    Material* material0 = Material::create(heapAllocator, program, texture0, sampler0, device.getUniformLocation(program, "in_Sampler"));
 
     const uint32_t pixels1[] = {
             black, white, black, white, black, white, black, white,
@@ -293,7 +305,7 @@ int main(int argc, char* argv[]) {
     };
     Texture2D texture1 = device.createTexture(8, 8, pixels1);
     Sampler sampler1 = device.createSampler(GL_LINEAR);
-    Material* material1 = Material::create(allocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
+    Material* material1 = Material::create(heapAllocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
 
     float vertexData[] = {
             -0.5, -0.5, 0.0,
@@ -350,14 +362,14 @@ int main(int argc, char* argv[]) {
 
     VertexArray vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
 
-    Model* model0 = Model::create(allocator, vertexArray, 1);
-    model0->meshes[0] = Mesh::create(allocator, 0, 3);
-    ModelInstance* modelInstance0 = ModelInstance::create(allocator, model0);
+    Model* model0 = Model::create(heapAllocator, vertexArray, 1);
+    model0->meshes[0] = Mesh::create(heapAllocator, 0, 3);
+    ModelInstance* modelInstance0 = ModelInstance::create(heapAllocator, model0);
     modelInstance0->materials[0] = material0;
 
-    Model* model1 = Model::create(allocator, vertexArray, 1);
-    model1->meshes[0] = Mesh::create(allocator, 3, 3);
-    ModelInstance* modelInstance1 = ModelInstance::create(allocator, model1);
+    Model* model1 = Model::create(heapAllocator, vertexArray, 1);
+    model1->meshes[0] = Mesh::create(heapAllocator, 3, 3);
+    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model1);
     modelInstance1->materials[0] = material1;
 
     int width = 0;
@@ -420,21 +432,34 @@ int main(int argc, char* argv[]) {
     VertexArray quadVertexArray = device.createVertexArray(vertexDeclarationQuad, 2, quadIndexBuffer);
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
-    CommandBuffer* setGBuffer = CommandBuffer::create(allocator, 4);
+    Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
+    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 4);
     CopyConstantBuffer::create(setGBuffer, constantBuffer, &in_vertexData, sizeof(in_vertexData));
     BindFramebuffer::create(setGBuffer, gBuffer);
-    SetViewport::create(setGBuffer, 0, 0, wgbuffer, hgbuffer);
+    SetViewport::create(setGBuffer, &gBufferViewport);
     ClearColor::create(setGBuffer, 0.25, 0.25, 0.25, 1);
 
-    CommandBuffer* drawQuad = CommandBuffer::create(allocator, 8);
+    viewport.x = 0;
+    viewport.y = 0;
+    viewport.width = width;
+    viewport.height = height;
+
+    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 8);
     BindFramebuffer::create(drawQuad, nullFramebuffer);
-    SetViewport::create(drawQuad, 0, 0, width, height);
+    SetViewport::create(drawQuad, &viewport);
     BindProgram::create(drawQuad, quadProgram);
     BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
     BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
     BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
     BindVertexArray::create(drawQuad, quadVertexArray);
     DrawTriangles::create(drawQuad, 0, 6);
+
+    modelInstance0->draw(2, renderQueue, setGBuffer);
+    modelInstance1->draw(1, renderQueue, setGBuffer);
+
+    renderQueue.submit(3, &drawQuad, 1);
+
+    CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer(heapAllocator);
 
     float angle = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -459,15 +484,11 @@ int main(int argc, char* argv[]) {
         in_vertexData.in_Color2[1] -= 0.00002;
         in_vertexData.in_Color2[2] -= 0.00003;
 
-        modelInstance0->draw(2, renderQueue, setGBuffer);
-        modelInstance1->draw(1, renderQueue, setGBuffer);
+        CommandBuffer::execute(commandBuffer, device);
 
-        renderQueue.submit(3, &drawQuad, 1);
-
-        renderQueue.submit();
-
-        fontItalic.printText(10, 180, "My font example");
-        fontRegular.printText(10, 130, "Memory used %ld bytes", allocator.memoryUsed());
+        fontItalic.printText(10, 230, "My font example");
+        fontItalic.printText(10, 180, "viewport: %d %d %d %d", viewport.x, viewport.y, viewport.width, viewport.height);
+        fontRegular.printText(10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
         fontRegular.printText(10, 80, "Executed commands %d | %.2f%% executed",
                               renderQueue.getExecutedCommands(), renderQueue.getExecutedCommands() / totalCommands * 100);
@@ -477,6 +498,18 @@ int main(int argc, char* argv[]) {
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    Model::destroy(heapAllocator, model0);
+    Model::destroy(heapAllocator, model1);
+    ModelInstance::destroy(heapAllocator, modelInstance0);
+    ModelInstance::destroy(heapAllocator, modelInstance1);
+    Material::destroy(heapAllocator, material0);
+    Material::destroy(heapAllocator, material1);
+    CommandBuffer::destroy(heapAllocator, setGBuffer);
+    CommandBuffer::destroy(heapAllocator, drawQuad);
+    CommandBuffer::destroy(heapAllocator, commandBuffer);
+
+    heapAllocator.dumpFreeList();
 
     glfwDestroyWindow(window);
     glfwTerminate();

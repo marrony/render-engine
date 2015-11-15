@@ -45,6 +45,13 @@ struct Renderbuffer {
     GLuint id;
 };
 
+struct Viewport {
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
 uint32_t VertexFloat2[] = {2, GL_FLOAT};
 uint32_t VertexFloat3[] = {3, GL_FLOAT};
 uint32_t VertexFloat4[] = {4, GL_FLOAT};
@@ -430,9 +437,9 @@ public:
         check_error(__FILE__, __LINE__);
     }
 
-    void bindTexture(Program program, Texture2D texture, int index) {
-        glActiveTexture(GL_TEXTURE0 + index);
-        glUniform1i(index, index);
+    void bindTexture(Program program, Texture2D texture, int unit) {
+        glActiveTexture(GL_TEXTURE0 + unit);
+        glUniform1i(unit, unit);
         check_error(__FILE__, __LINE__);
 
         glBindTexture(GL_TEXTURE_2D, texture.id);

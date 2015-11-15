@@ -5,9 +5,11 @@
 #ifndef ALLOCATOR_H
 #define ALLOCATOR_H
 
+#include <assert.h>
+
 class LinearAllocator {
 public:
-    LinearAllocator(int8_t* begin, size_t size) : begin(begin), current(begin), end(begin + size) { }
+    LinearAllocator(void* begin, size_t size) : begin((int8_t*)begin), current((int8_t*)begin), end((int8_t*)begin + size) { }
 
     void* allocate(size_t size) {
         if (current + size > end)
@@ -33,9 +35,16 @@ private:
 
 class HeapAllocator {
 public:
-    HeapAllocator() : freeList(nullptr) { }
+    HeapAllocator() : freeList(nullptr), bytesAllocated(0), numberAllocations(0) { }
 
     ~HeapAllocator() {
+        clearMemory();
+    }
+
+    void clearMemory() {
+        assert(numberAllocations == 0);
+        assert(bytesAllocated == 0);
+
         while(freeList) {
             void* ptr = freeList;
 
@@ -58,6 +67,11 @@ public:
         }
 
         if(!current) {
+            size = roundSize(size);
+
+            bytesAllocated += size;
+            numberAllocations++;
+
             FreeList* header = (FreeList*) malloc(size + sizeof(FreeList));
             header->size = size;
             return header->data;
@@ -88,8 +102,35 @@ public:
         FreeList* newFreeList = (FreeList*) ptr - 1;
         newFreeList->next = freeList;
         freeList = newFreeList;
+
+        numberAllocations--;
+        bytesAllocated -= newFreeList->size;
+    }
+
+    size_t memoryUsed() {
+        return bytesAllocated;
+    }
+
+    void dumpFreeList() {
+        printf("numberAllocations: %ld\n", numberAllocations);
+        printf("bytesAllocated: %ld\n", bytesAllocated);
+
+        FreeList* f = freeList;
+        while(f) {
+            printf("free: %ld\n", f->size);
+            f = f->next;
+        }
     }
 private:
+    size_t roundSize(size_t size) {
+        size_t blocks = size / 128;
+
+        if((size % 128) != 0)
+            blocks++;
+
+        return blocks * 128;
+    }
+
     struct FreeList {
         size_t size;
         FreeList* next;
@@ -97,6 +138,8 @@ private:
     };
 
     FreeList* freeList;
+    size_t numberAllocations;
+    size_t bytesAllocated;
 };
 
 template<int SIZE>

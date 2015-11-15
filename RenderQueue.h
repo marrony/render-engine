@@ -6,6 +6,7 @@
 #define RENDERQUEUE_H
 
 #include <algorithm>
+#include <functional>
 
 struct RenderItem {
     uint64_t key;
@@ -37,7 +38,42 @@ public:
         itemsCount++;
     }
 
-    void submit() {
+    CommandBuffer* sendToCommandBuffer(HeapAllocator& allocator) {
+        CommandBuffer* commandBuffer = CommandBuffer::create(allocator, 10);
+
+        std::function<void(Command*)> exec = [&](Command* src) {
+            if(commandBuffer->commandCount >= commandBuffer->maxCommands) {
+                int maxCommands = commandBuffer->commandCount * 3 / 2;
+                commandBuffer = CommandBuffer::realloc(allocator, commandBuffer, maxCommands);
+            }
+
+            Command* dst = CommandBuffer::getCommandAt(commandBuffer, commandBuffer->commandCount++);
+
+            memcpy(dst, src, COMMAND_MAX_SIZE);
+        };
+
+        submit(exec);
+
+        return commandBuffer;
+    }
+
+    void sendToDevice() {
+        std::function<void(Command*)> exec = [this](Command* cmd) {
+            invoke(cmd);
+        };
+
+        submit(exec);
+    }
+
+    int getSkippedCommands() {
+        return skippedCommands;
+    }
+
+    int getExecutedCommands() {
+        return executedCommands;
+    }
+private:
+    void submit(std::function<void(Command*)> execute) {
         bool statesSet[COMMAND_MAX];
         bool nonDefaultState[COMMAND_MAX];
         Command* previousState[COMMAND_MAX];
@@ -59,7 +95,7 @@ public:
                 CommandBuffer* commandBuffer = item.commandBuffer[j];
 
                 for (int k = 0; k < commandBuffer->commandCount; k++) {
-                    Command* cmd = getCommandAt(commandBuffer, k);
+                    Command* cmd = CommandBuffer::getCommandAt(commandBuffer, k);
 
                     extern const int sizeCommand[];
 
@@ -81,20 +117,9 @@ public:
         itemsCount = 0;
     }
 
-    int getSkippedCommands() {
-        return skippedCommands;
-    }
-
-    int getExecutedCommands() {
-        return executedCommands;
-    }
-
-private:
-    void execute(Command* cmd) {
-        extern const FnSubmitCommand submitCommand[];
-
+    void invoke(Command* cmd) {
         executedCommands++;
-        submitCommand[cmd->id](device, cmd);
+        Command::invoke(cmd, device);
     }
 
     Device& device;

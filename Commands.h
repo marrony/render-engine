@@ -27,8 +27,16 @@ enum CommandType {
 
 const int COMMAND_MAX_SIZE = 24;
 
+typedef void (* FnSubmitCommand)(Device& device, class Command* command);
+
 struct Command {
     uint32_t id;
+
+    static void invoke(Command* cmd, Device& device) {
+        extern const FnSubmitCommand submitCommand[];
+
+        submitCommand[cmd->id](device, cmd);
+    }
 };
 
 struct CommandBuffer {
@@ -36,7 +44,7 @@ struct CommandBuffer {
     int maxCommands;
     char commands[];
 
-    static CommandBuffer* create(LinearAllocator& allocator, int maxCommands) {
+    static CommandBuffer* create(HeapAllocator& allocator, int maxCommands) {
         size_t nbytes = sizeof(CommandBuffer) + maxCommands * COMMAND_MAX_SIZE;
 
         CommandBuffer* commandBuffer = (CommandBuffer*) allocator.allocate(nbytes);
@@ -44,6 +52,31 @@ struct CommandBuffer {
         commandBuffer->maxCommands = maxCommands;
 
         return commandBuffer;
+    }
+
+    static CommandBuffer* realloc(HeapAllocator& allocator, CommandBuffer* commandBuffer, int maxCommands) {
+        size_t nbytes = sizeof(CommandBuffer) + maxCommands * COMMAND_MAX_SIZE;
+
+        commandBuffer = (CommandBuffer*) allocator.reallocate(commandBuffer, nbytes);
+        commandBuffer->maxCommands = maxCommands;
+
+        return commandBuffer;
+    }
+
+    static void destroy(HeapAllocator& allocator, CommandBuffer* commandBuffer) {
+        allocator.deallocate(commandBuffer);
+    }
+
+    static Command* getCommandAt(CommandBuffer* commandBuffer, int index) {
+        return (Command*) &commandBuffer->commands[index * COMMAND_MAX_SIZE];
+    }
+
+    static void execute(CommandBuffer* commandBuffer, Device& device) {
+        for(int i = 0; i < commandBuffer->commandCount; i++) {
+            Command* command = getCommandAt(commandBuffer, i);
+
+            Command::invoke(command, device);
+        }
     }
 };
 
@@ -59,10 +92,6 @@ T* getCommand(CommandBuffer* commandBuffer) {
     command->command.id = T::TYPE;
 
     return command;
-}
-
-Command* getCommandAt(CommandBuffer* commandBuffer, int index) {
-    return (Command*) &commandBuffer->commands[index * COMMAND_MAX_SIZE];
 }
 
 struct BindFramebuffer {
@@ -101,95 +130,23 @@ struct ClearColor {
     }
 };
 
-//todo remove this?
-struct SetViewportRelative {
-    Command command;
-    float x;
-    float y;
-    float width;
-    float height;
-
-    static const uint32_t TYPE = SET_VIEWPORT_REL;
-
-    static void create(CommandBuffer* commandBuffer, float x, float y, float width, float height) {
-        SetViewportRelative* setViewport = getCommand<SetViewportRelative>(commandBuffer);
-        setViewport->x = x;
-        setViewport->y = y;
-        setViewport->width = width;
-        setViewport->height = height;
-    }
-
-    static void submit(Device& device, SetViewportRelative* cmd) {
-        GLFWwindow* window = glfwGetCurrentContext();
-
-        int w = 0;
-        int h = 0;
-
-        GLint framebuffer;
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
-
-        if(framebuffer != 0) {
-            GLint type;
-            GLint object;
-
-            glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &type);
-            glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &object);
-
-            if(type == GL_TEXTURE) {
-                GLint tex;
-
-                glGetIntegerv(GL_TEXTURE_BINDING_2D, &tex);
-
-                glBindTexture(GL_TEXTURE_2D, object);
-
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
-
-                glBindTexture(GL_TEXTURE_2D, tex);
-            } else if(type == GL_RENDERBUFFER) {
-                glBindRenderbuffer(GL_RENDERBUFFER, object);
-
-                glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &w);
-                glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &h);
-
-                glBindRenderbuffer(GL_RENDERBUFFER, 0);
-            }
-        } else {
-            glfwGetFramebufferSize(window, &w, &h);
-        }
-
-        int x = w * cmd->x;
-        int y = h * cmd->y;
-        int width = (w * cmd->width) - x;
-        int height = (h * cmd->height) - y;
-
-        glEnable(GL_SCISSOR_TEST);
-        glViewport(x, y, width, height);
-        glScissor(x, y, width, height);
-    }
-};
-
 struct SetViewport {
     Command command;
-    int x;
-    int y;
-    int width;
-    int height;
+    Viewport* viewport;
 
     static const uint32_t TYPE = SET_VIEWPORT;
 
-    static void create(CommandBuffer* commandBuffer, int x, int y, int width, int height) {
+    static void create(CommandBuffer* commandBuffer, Viewport* viewport) {
         SetViewport* setViewport = getCommand<SetViewport>(commandBuffer);
-        setViewport->x = x;
-        setViewport->y = y;
-        setViewport->width = width;
-        setViewport->height = height;
+        setViewport->viewport = viewport;
     }
 
     static void submit(Device& device, SetViewport* cmd) {
+        Viewport* viewport = cmd->viewport;
+
         glEnable(GL_SCISSOR_TEST);
-        glViewport(cmd->x, cmd->y, cmd->width, cmd->height);
-        glScissor(cmd->x, cmd->y, cmd->width, cmd->height);
+        glViewport(viewport->x, viewport->y, viewport->width, viewport->height);
+        glScissor(viewport->x, viewport->y, viewport->width, viewport->height);
     }
 };
 
@@ -272,16 +229,16 @@ struct BindTexture {
 
     static const uint32_t TYPE = BIND_TEXTURE0;
 
-    static void create(CommandBuffer* commandBuffer, Program program, Texture2D texture, int index) {
+    static void create(CommandBuffer* commandBuffer, Program program, Texture2D texture, int unit) {
         BindTexture* bindTexture = getCommand<BindTexture>(commandBuffer);
-        bindTexture->command.id += index;
+        bindTexture->command.id += unit;
         bindTexture->program = program;
         bindTexture->texture = texture;
     }
 
     static void submit(Device& device, BindTexture* cmd) {
-        int index = cmd->command.id - BIND_TEXTURE0;
-        device.bindTexture(cmd->program, cmd->texture, index);
+        int unit = cmd->command.id - BIND_TEXTURE0;
+        device.bindTexture(cmd->program, cmd->texture, unit);
     }
 };
 
@@ -323,14 +280,11 @@ struct DrawTrianglesInstanced {
     }
 };
 
-typedef void (* FnSubmitCommand)(Device& device, Command* command);
-
 const FnSubmitCommand submitCommand[] = {
         [DRAW_TRIANGLES] = FnSubmitCommand(DrawTriangles::submit),
         [DRAW_TRIANGLES_INSTANCED] = FnSubmitCommand(DrawTrianglesInstanced::submit),
         [CLEAR_COLOR] = FnSubmitCommand(ClearColor::submit),
         [BIND_FRAMEBUFFER] = FnSubmitCommand(BindFramebuffer::submit),
-        [SET_VIEWPORT_REL] = FnSubmitCommand(SetViewportRelative::submit),
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
         [BIND_VERTEX_ARRAY] = FnSubmitCommand(BindVertexArray::submit),
@@ -346,7 +300,6 @@ const int sizeCommand[] = {
         [DRAW_TRIANGLES_INSTANCED] = sizeof(DrawTrianglesInstanced),
         [CLEAR_COLOR] = sizeof(ClearColor),
         [BIND_FRAMEBUFFER] = sizeof(BindFramebuffer),
-        [SET_VIEWPORT_REL] = sizeof(SetViewportRelative),
         [SET_VIEWPORT] = sizeof(SetViewport),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
         [BIND_VERTEX_ARRAY] = sizeof(BindVertexArray),

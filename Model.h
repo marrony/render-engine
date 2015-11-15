@@ -8,13 +8,18 @@
 struct Mesh {
     CommandBuffer* draw;
 
-    static Mesh* create(LinearAllocator& allocator, int offset, int count) {
+    static Mesh* create(HeapAllocator& allocator, int offset, int count) {
         Mesh* mesh = (Mesh*) allocator.allocate(sizeof(Mesh));
 
         mesh->draw = CommandBuffer::create(allocator, 1);
         DrawTriangles::create(mesh->draw, offset, count);
 
         return mesh;
+    }
+
+    static void destroy(HeapAllocator& allocator, Mesh* mesh) {
+        allocator.deallocate(mesh->draw);
+        allocator.deallocate(mesh);
     }
 };
 
@@ -23,7 +28,7 @@ struct Model {
     int meshCount;
     Mesh* meshes[];
 
-    static Model* create(LinearAllocator& allocator, VertexArray vertexArray, int meshCount) {
+    static Model* create(HeapAllocator& allocator, VertexArray vertexArray, int meshCount) {
         Model* model = (Model*) allocator.allocate(sizeof(Model) + meshCount * sizeof(Mesh*));
 
         model->state = CommandBuffer::create(allocator, 1);
@@ -32,12 +37,19 @@ struct Model {
 
         return model;
     }
+
+    static void destroy(HeapAllocator& allocator, Model* model) {
+        allocator.deallocate(model->state);
+        for(int i = 0; i < model->meshCount; i++)
+            Mesh::destroy(allocator, model->meshes[i]);
+        allocator.deallocate(model);
+    }
 };
 
 struct Material {
     CommandBuffer* state;
 
-    static Material* create(LinearAllocator& allocator, Program program, Texture2D texture, Sampler sampler, int index) {
+    static Material* create(HeapAllocator& allocator, Program program, Texture2D texture, Sampler sampler, int index) {
         Material* material = (Material*) allocator.allocate(sizeof(Material));
 
         material->state = CommandBuffer::create(allocator, 3);
@@ -46,6 +58,11 @@ struct Material {
         BindSampler::create(material->state, program, sampler, index);
 
         return material;
+    }
+
+    static void destroy(HeapAllocator& allocator, Material* material) {
+        allocator.deallocate(material->state);
+        allocator.deallocate(material);
     }
 };
 
@@ -71,7 +88,7 @@ struct ModelInstance {
         }
     }
 
-    static ModelInstance* create(LinearAllocator& allocator, Model* model) {
+    static ModelInstance* create(HeapAllocator& allocator, Model* model) {
         size_t nbytes = sizeof(ModelInstance) + model->meshCount * sizeof(Material*);
         ModelInstance* modelInstance = (ModelInstance*) allocator.allocate(nbytes);
 
@@ -79,6 +96,11 @@ struct ModelInstance {
         modelInstance->model = model;
 
         return modelInstance;
+    }
+
+    static void destroy(HeapAllocator& allocator, ModelInstance* modelInstance) {
+        allocator.deallocate(modelInstance->state);
+        allocator.deallocate(modelInstance);
     }
 };
 
