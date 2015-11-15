@@ -74,12 +74,9 @@ public:
     }
 private:
     void submit(std::function<void(Command*)> execute) {
-        bool statesSet[COMMAND_MAX];
-        bool nonDefaultState[COMMAND_MAX];
-        Command* previousState[COMMAND_MAX];
+        Command* previousCmd[COMMAND_MAX];
 
-        memset(previousState, 0, sizeof(previousState));
-        memset(nonDefaultState, 0xff, sizeof(nonDefaultState));
+        memset(previousCmd, 0, sizeof(previousCmd));
 
         executedCommands = 0;
         skippedCommands = 0;
@@ -87,8 +84,6 @@ private:
         std::sort(items, items+itemsCount);
 
         for (int i = 0; i < itemsCount; i++) {
-            memset(statesSet, 0, sizeof(statesSet));
-
             RenderItem& item = items[i];
 
             for (int j = 0; j < item.commandBufferCount; j++) {
@@ -103,10 +98,9 @@ private:
 
                     int size = sizeCommand[id];
 
-                    if (!statesSet[id] && (!previousState[id] || memcmp(previousState[id], cmd, size) != 0)) {
+                    if (isDrawCommand(id) || !previousCmd[id] || memcmp(previousCmd[id], cmd, size) != 0) {
                         execute(cmd);
-                        statesSet[id] = true;
-                        previousState[id] = cmd;
+                        previousCmd[id] = cmd;
                     } else {
                         skippedCommands++;
                     }
@@ -115,6 +109,10 @@ private:
         }
 
         itemsCount = 0;
+    }
+
+    bool isDrawCommand(uint32_t id) {
+        return id <= DRAW_COMMANDS_MAX;
     }
 
     void invoke(Command* cmd) {
@@ -127,8 +125,6 @@ private:
     RenderItem* items;
     int executedCommands;
     int skippedCommands;
-
-    Command* defaults[COMMAND_MAX];
 };
 
 #endif //RENDERQUEUE_H
