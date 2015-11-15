@@ -420,21 +420,21 @@ int main(int argc, char* argv[]) {
     VertexArray quadVertexArray = device.createVertexArray(vertexDeclarationQuad, 2, quadIndexBuffer);
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
-    State* setFramebufferState = State::create(allocator, 4);
-    setFramebufferState->commands[0] = CopyConstantBuffer::create(allocator, constantBuffer, &in_vertexData, sizeof(in_vertexData));
-    setFramebufferState->commands[1] = BindFramebuffer::create(allocator, gBuffer);
-    setFramebufferState->commands[2] = SetViewport::create(allocator, 0, 0, wgbuffer, hgbuffer);
-    setFramebufferState->commands[3] = ClearColor::create(allocator, 0.25, 0.25, 0.25, 1);
+    CommandBuffer* setGBuffer = CommandBuffer::create(allocator, 4);
+    setGBuffer->commands[0] = CopyConstantBuffer::create(allocator, constantBuffer, &in_vertexData, sizeof(in_vertexData));
+    setGBuffer->commands[1] = BindFramebuffer::create(allocator, gBuffer);
+    setGBuffer->commands[2] = SetViewport::create(allocator, 0, 0, wgbuffer, hgbuffer);
+    setGBuffer->commands[3] = ClearColor::create(allocator, 0.25, 0.25, 0.25, 1);
 
-    State* quadFramebufferState = State::create(allocator, 7);
-    quadFramebufferState->commands[0] = BindFramebuffer::create(allocator, nullFramebuffer);
-    quadFramebufferState->commands[1] = SetViewport::create(allocator, 0, 0, width, height);
-    quadFramebufferState->commands[2] = BindProgram::create(allocator, quadProgram);
-    quadFramebufferState->commands[3] = BindTexture::create(allocator, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
-    quadFramebufferState->commands[4] = BindTexture::create(allocator, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
-    quadFramebufferState->commands[5] = BindTexture::create(allocator, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
-    quadFramebufferState->commands[6] = BindVertexArray::create(allocator, quadVertexArray);
-    DrawCommand* drawQuad = DrawTriangles::create(allocator, 0, 6);
+    CommandBuffer* drawQuad = CommandBuffer::create(allocator, 8);
+    drawQuad->commands[0] = BindFramebuffer::create(allocator, nullFramebuffer);
+    drawQuad->commands[1] = SetViewport::create(allocator, 0, 0, width, height);
+    drawQuad->commands[2] = BindProgram::create(allocator, quadProgram);
+    drawQuad->commands[3] = BindTexture::create(allocator, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
+    drawQuad->commands[4] = BindTexture::create(allocator, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
+    drawQuad->commands[5] = BindTexture::create(allocator, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
+    drawQuad->commands[6] = BindVertexArray::create(allocator, quadVertexArray);
+    drawQuad->commands[7] = DrawTriangles::create(allocator, 0, 6);
 
     float angle = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -459,10 +459,10 @@ int main(int argc, char* argv[]) {
         in_vertexData.in_Color2[1] -= 0.00002;
         in_vertexData.in_Color2[2] -= 0.00003;
 
-        modelInstance0->draw(2, renderQueue, setFramebufferState);
-        modelInstance1->draw(1, renderQueue, setFramebufferState);
+        modelInstance0->draw(2, renderQueue, setGBuffer);
+        modelInstance1->draw(1, renderQueue, setGBuffer);
 
-        renderQueue.submit(3, drawQuad, &quadFramebufferState, 1);
+        renderQueue.submit(3, &drawQuad, 1);
 
         renderQueue.submit();
 

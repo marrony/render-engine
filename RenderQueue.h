@@ -9,9 +9,8 @@
 
 struct RenderItem {
     uint64_t key;
-    DrawCommand* cmd;
-    int statesCount;
-    State* states[COMMAND_MAX];
+    int commandBufferCount;
+    CommandBuffer* commandBuffer[COMMAND_MAX];
 };
 
 bool operator<(const RenderItem& i0, const RenderItem& i1) {
@@ -19,7 +18,7 @@ bool operator<(const RenderItem& i0, const RenderItem& i1) {
 }
 
 struct RenderGroup {
-    State* state;
+    CommandBuffer* commandBuffer;
     int itemsCount;
     RenderItem* items;
 };
@@ -30,19 +29,18 @@ public:
         items = new RenderItem[1024];
     }
 
-    void submit(uint64_t key, DrawCommand* draw, State** states, int statesCount) {
+    void submit(uint64_t key, CommandBuffer** commandBuffer, int commandBufferCount) {
         items[itemsCount].key = key;
-        items[itemsCount].cmd = draw;
-        for (int i = 0; i < statesCount; i++)
-            items[itemsCount].states[i] = states[i];
-        items[itemsCount].statesCount = statesCount;
+        for (int i = 0; i < commandBufferCount; i++)
+            items[itemsCount].commandBuffer[i] = commandBuffer[i];
+        items[itemsCount].commandBufferCount = commandBufferCount;
         itemsCount++;
     }
 
     void submit() {
         bool statesSet[COMMAND_MAX];
         bool nonDefaultState[COMMAND_MAX];
-        StateCommand* previousState[COMMAND_MAX];
+        Command* previousState[COMMAND_MAX];
 
         memset(previousState, 0, sizeof(previousState));
         memset(nonDefaultState, 0xff, sizeof(nonDefaultState));
@@ -57,29 +55,27 @@ public:
 
             RenderItem& item = items[i];
 
-            for (int j = 0; j < item.statesCount; j++) {
-                State* state = item.states[j];
+            for (int j = 0; j < item.commandBufferCount; j++) {
+                CommandBuffer* commandBuffer = item.commandBuffer[j];
 
-                for (int k = 0; k < state->commandCount; k++) {
-                    StateCommand* stateCmd = state->commands[k];
+                for (int k = 0; k < commandBuffer->commandCount; k++) {
+                    Command* cmd = commandBuffer->commands[k];
 
                     extern const int sizeCommand[];
 
-                    uint32_t id = stateCmd->id;
+                    uint32_t id = cmd->id;
 
                     int size = sizeCommand[id];
 
-                    if (!statesSet[id] && (!previousState[id] || memcmp(previousState[id], stateCmd, size) != 0)) {
-                        execute(&stateCmd->command);
+                    if (!statesSet[id] && (!previousState[id] || memcmp(previousState[id], cmd, size) != 0)) {
+                        execute(cmd);
                         statesSet[id] = true;
-                        previousState[id] = stateCmd;
+                        previousState[id] = cmd;
                     } else {
                         skippedCommands++;
                     }
                 }
             }
-
-            execute(&item.cmd->command);
         }
 
         itemsCount = 0;
@@ -107,7 +103,7 @@ private:
     int executedCommands;
     int skippedCommands;
 
-    StateCommand* defaults[COMMAND_MAX];
+    Command* defaults[COMMAND_MAX];
 };
 
 #endif //RENDERQUEUE_H

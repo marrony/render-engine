@@ -27,27 +27,17 @@ struct Command {
     uint32_t id;
 };
 
-union StateCommand {
-    Command command;
-    uint32_t id;
-};
-
-union DrawCommand {
-    Command command;
-    uint32_t id;
-};
-
-struct State {
+struct CommandBuffer {
     int commandCount;
-    StateCommand* commands[];
+    Command* commands[];
 
-    static State* create(LinearAllocator& allocator, int commandCount) {
-        size_t nbytes = sizeof(State) + commandCount * sizeof(StateCommand*);
+    static CommandBuffer* create(LinearAllocator& allocator, int commandCount) {
+        size_t nbytes = sizeof(CommandBuffer) + commandCount * sizeof(Command*);
 
-        State* state = (State*) allocator.allocate(nbytes);
-        state->commandCount = commandCount;
+        CommandBuffer* commandBuffer = (CommandBuffer*) allocator.allocate(nbytes);
+        commandBuffer->commandCount = commandCount;
 
-        return state;
+        return commandBuffer;
     }
 };
 
@@ -59,12 +49,12 @@ T* createCommand(LinearAllocator& allocator) {
 }
 
 struct BindFramebuffer {
-    StateCommand command;
+    Command command;
     Framebuffer framebuffer;
 
     static const uint8_t TYPE = BIND_FRAMEBUFFER;
 
-    static StateCommand* create(LinearAllocator& allocator, Framebuffer framebuffer) {
+    static Command* create(LinearAllocator& allocator, Framebuffer framebuffer) {
         BindFramebuffer* bindFramebuffer = createCommand<BindFramebuffer>(allocator);
         bindFramebuffer->framebuffer = framebuffer;
         return &bindFramebuffer->command;
@@ -76,12 +66,12 @@ struct BindFramebuffer {
 };
 
 struct ClearColor {
-    StateCommand command;
+    Command command;
     float r, g, b, a;
 
     static const uint8_t TYPE = CLEAR_COLOR;
 
-    static StateCommand* create(LinearAllocator& allocator, float r, float g, float b, float a) {
+    static Command* create(LinearAllocator& allocator, float r, float g, float b, float a) {
         ClearColor* clearColor = createCommand<ClearColor>(allocator);
         clearColor->r = r;
         clearColor->g = g;
@@ -98,7 +88,7 @@ struct ClearColor {
 
 //todo remove this?
 struct SetViewportRelative {
-    StateCommand command;
+    Command command;
     float x;
     float y;
     float width;
@@ -106,7 +96,7 @@ struct SetViewportRelative {
 
     static const uint8_t TYPE = SET_VIEWPORT_REL;
 
-    static StateCommand* create(LinearAllocator& allocator, float x, float y, float width, float height) {
+    static Command* create(LinearAllocator& allocator, float x, float y, float width, float height) {
         SetViewportRelative* setViewport = createCommand<SetViewportRelative>(allocator);
         setViewport->x = x;
         setViewport->y = y;
@@ -166,7 +156,7 @@ struct SetViewportRelative {
 };
 
 struct SetViewport {
-    StateCommand command;
+    Command command;
     int x;
     int y;
     int width;
@@ -174,7 +164,7 @@ struct SetViewport {
 
     static const uint8_t TYPE = SET_VIEWPORT;
 
-    static StateCommand* create(LinearAllocator& allocator, int x, int y, int width, int height) {
+    static Command* create(LinearAllocator& allocator, int x, int y, int width, int height) {
         SetViewport* setViewport = createCommand<SetViewport>(allocator);
         setViewport->x = x;
         setViewport->y = y;
@@ -191,14 +181,14 @@ struct SetViewport {
 };
 
 struct CopyConstantBuffer {
-    StateCommand command;
+    Command command;
     ConstantBuffer constantBuffer;
     const void* data;
     size_t size;
 
     static const uint8_t TYPE = COPY_CONSTANT_BUFFER;
 
-    static StateCommand* create(LinearAllocator& allocator, ConstantBuffer constantBuffer, const void* data, size_t size) {
+    static Command* create(LinearAllocator& allocator, ConstantBuffer constantBuffer, const void* data, size_t size) {
         CopyConstantBuffer* copyConstantBuffer = createCommand<CopyConstantBuffer>(allocator);
         copyConstantBuffer->constantBuffer = constantBuffer;
         copyConstantBuffer->data = data;
@@ -212,12 +202,12 @@ struct CopyConstantBuffer {
 };
 
 struct BindVertexArray {
-    StateCommand command;
+    Command command;
     VertexArray vertexArray;
 
     static const uint8_t TYPE = BIND_VERTEX_ARRAY;
 
-    static StateCommand* create(LinearAllocator& allocator, VertexArray vertexArray) {
+    static Command* create(LinearAllocator& allocator, VertexArray vertexArray) {
         BindVertexArray* bindVertexArray = createCommand<BindVertexArray>(allocator);
         bindVertexArray->vertexArray = vertexArray;
         return &bindVertexArray->command;
@@ -229,12 +219,12 @@ struct BindVertexArray {
 };
 
 struct BindProgram {
-    StateCommand command;
+    Command command;
     Program program;
 
     static const uint8_t TYPE = BIND_PROGRAM;
 
-    static StateCommand* create(LinearAllocator& allocator, Program program) {
+    static Command* create(LinearAllocator& allocator, Program program) {
         BindProgram* bindProgram = createCommand<BindProgram>(allocator);
         bindProgram->program = program;
         return &bindProgram->command;
@@ -246,14 +236,14 @@ struct BindProgram {
 };
 
 struct BindSampler {
-    StateCommand command;
+    Command command;
     Program program;
     Sampler sampler;
     int unit;
 
     static const uint8_t TYPE = BIND_SAMPLER;
 
-    static StateCommand* create(LinearAllocator& allocator, Program program, Sampler sampler, int unit) {
+    static Command* create(LinearAllocator& allocator, Program program, Sampler sampler, int unit) {
         BindSampler* bindSampler = createCommand<BindSampler>(allocator);
         bindSampler->program = program;
         bindSampler->sampler = sampler;
@@ -267,13 +257,13 @@ struct BindSampler {
 };
 
 struct BindTexture {
-    StateCommand command;
+    Command command;
     Program program;
     Texture2D texture;
 
     static const uint8_t TYPE = BIND_TEXTURE0;
 
-    static StateCommand* create(LinearAllocator& allocator, Program program, Texture2D texture, int index) {
+    static Command* create(LinearAllocator& allocator, Program program, Texture2D texture, int index) {
         BindTexture* bindTexture = createCommand<BindTexture>(allocator);
         bindTexture->command.id += index;
         bindTexture->program = program;
@@ -288,13 +278,13 @@ struct BindTexture {
 };
 
 struct DrawTriangles {
-    DrawCommand command;
+    Command command;
     int offset;
     int count;
 
     static const uint8_t TYPE = DRAW_TRIANGLES;
 
-    static DrawCommand* create(LinearAllocator& allocator, int offset, int count) {
+    static Command* create(LinearAllocator& allocator, int offset, int count) {
         DrawTriangles* drawTriangles = createCommand<DrawTriangles>(allocator);
         drawTriangles->offset = offset;
         drawTriangles->count = count;
@@ -307,14 +297,14 @@ struct DrawTriangles {
 };
 
 struct DrawTrianglesInstanced {
-    DrawCommand command;
+    Command command;
     int offset;
     int count;
     int instances;
 
     static const uint8_t TYPE = DRAW_TRIANGLES_INSTANCED;
 
-    static DrawCommand* create(LinearAllocator& allocator, int offset, int count, int instances) {
+    static Command* create(LinearAllocator& allocator, int offset, int count, int instances) {
         DrawTrianglesInstanced* drawTrianglesInstanced = createCommand<DrawTrianglesInstanced>(allocator);
         drawTrianglesInstanced->offset = offset;
         drawTrianglesInstanced->count = count;
