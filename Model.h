@@ -12,7 +12,7 @@ struct Mesh {
         Mesh* mesh = (Mesh*) allocator.allocate(sizeof(Mesh));
 
         mesh->draw = CommandBuffer::create(allocator, 1);
-        mesh->draw->commands[0] = DrawTriangles::create(allocator, offset, count);
+        DrawTriangles::create(mesh->draw, offset, count);
 
         return mesh;
     }
@@ -27,7 +27,7 @@ struct Model {
         Model* model = (Model*) allocator.allocate(sizeof(Model) + meshCount * sizeof(Mesh*));
 
         model->state = CommandBuffer::create(allocator, 1);
-        model->state->commands[0] = BindVertexArray::create(allocator, vertexArray);
+        BindVertexArray::create(model->state, vertexArray);
         model->meshCount = meshCount;
 
         return model;
@@ -41,9 +41,9 @@ struct Material {
         Material* material = (Material*) allocator.allocate(sizeof(Material));
 
         material->state = CommandBuffer::create(allocator, 3);
-        material->state->commands[0] = BindProgram::create(allocator, program);
-        material->state->commands[1] = BindTexture::create(allocator, program, texture, index);
-        material->state->commands[2] = BindSampler::create(allocator, program, sampler, index);
+        BindProgram::create(material->state, program);
+        BindTexture::create(material->state, program, texture, index);
+        BindSampler::create(material->state, program, sampler, index);
 
         return material;
     }

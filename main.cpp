@@ -421,20 +421,20 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
     CommandBuffer* setGBuffer = CommandBuffer::create(allocator, 4);
-    setGBuffer->commands[0] = CopyConstantBuffer::create(allocator, constantBuffer, &in_vertexData, sizeof(in_vertexData));
-    setGBuffer->commands[1] = BindFramebuffer::create(allocator, gBuffer);
-    setGBuffer->commands[2] = SetViewport::create(allocator, 0, 0, wgbuffer, hgbuffer);
-    setGBuffer->commands[3] = ClearColor::create(allocator, 0.25, 0.25, 0.25, 1);
+    CopyConstantBuffer::create(setGBuffer, constantBuffer, &in_vertexData, sizeof(in_vertexData));
+    BindFramebuffer::create(setGBuffer, gBuffer);
+    SetViewport::create(setGBuffer, 0, 0, wgbuffer, hgbuffer);
+    ClearColor::create(setGBuffer, 0.25, 0.25, 0.25, 1);
 
     CommandBuffer* drawQuad = CommandBuffer::create(allocator, 8);
-    drawQuad->commands[0] = BindFramebuffer::create(allocator, nullFramebuffer);
-    drawQuad->commands[1] = SetViewport::create(allocator, 0, 0, width, height);
-    drawQuad->commands[2] = BindProgram::create(allocator, quadProgram);
-    drawQuad->commands[3] = BindTexture::create(allocator, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
-    drawQuad->commands[4] = BindTexture::create(allocator, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
-    drawQuad->commands[5] = BindTexture::create(allocator, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
-    drawQuad->commands[6] = BindVertexArray::create(allocator, quadVertexArray);
-    drawQuad->commands[7] = DrawTriangles::create(allocator, 0, 6);
+    BindFramebuffer::create(drawQuad, nullFramebuffer);
+    SetViewport::create(drawQuad, 0, 0, width, height);
+    BindProgram::create(drawQuad, quadProgram);
+    BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
+    BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
+    BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
+    BindVertexArray::create(drawQuad, quadVertexArray);
+    DrawTriangles::create(drawQuad, 0, 6);
 
     float angle = 0;
     while (!glfwWindowShouldClose(window)) {

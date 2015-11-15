@@ -59,7 +59,7 @@ public:
                 CommandBuffer* commandBuffer = item.commandBuffer[j];
 
                 for (int k = 0; k < commandBuffer->commandCount; k++) {
-                    Command* cmd = commandBuffer->commands[k];
+                    Command* cmd = getCommandAt(commandBuffer, k);
 
                     extern const int sizeCommand[];
 
