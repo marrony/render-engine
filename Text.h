@@ -30,6 +30,7 @@ const char* fragmentFontSource = STR(
         }
 );
 
+//TODO Make different fonts use same programs/vertexBuffers/indexBuffer
 class Font {
 public:
     Font(Device& device, const char* fontFace) : device(device) {
@@ -82,6 +83,16 @@ public:
         IndexBuffer indexBuffer = {0};
         vertexArray = device.createVertexArray(vertexDeclaration, 1, indexBuffer);
         program = device.createProgram(vertexFontSource, fragmentFontSource);
+    }
+
+    void destroy() {
+        for (int ch = 0; ch < 128; ch++) {
+            device.destroyTexture(characters[ch].texture);
+        }
+
+        device.destroyVertexBuffer(vertexBuffer);
+        device.destroyVertexArray(vertexArray);
+        device.destroyProgram(program);
     }
 
     void printText(float x, float y, const char* fmt, ...) {

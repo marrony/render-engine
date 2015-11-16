@@ -541,6 +541,31 @@ int main(int argc, char* argv[]) {
     CommandBuffer::destroy(heapAllocator, drawQuad);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
 
+    device.destroyTexture(texture0);
+    device.destroyTexture(texture1);
+    device.destroyTexture(position);
+    device.destroyTexture(normal);
+    device.destroyTexture(albedo);
+    device.destroySampler(sampler0);
+    device.destroySampler(sampler1);
+    device.destoryRenderbuffer(depth);
+    device.destroyFramebuffer(gBuffer);
+    device.destroyVertexBuffer(vertexBuffer);
+    device.destroyVertexBuffer(normalBuffer);
+    device.destroyVertexBuffer(textureBuffer);
+    device.destroyVertexBuffer(colorBuffer);
+    device.destroyIndexBuffer(indexBuffer);
+    device.destroyConstantBuffer(constantBuffer);
+    device.destroyVertexArray(vertexArray);
+    device.destroyVertexBuffer(quadVertexBuffer);
+    device.destroyVertexBuffer(quadTextureBuffer);
+    device.destroyIndexBuffer(quadIndexBuffer);
+    device.destroyVertexArray(quadVertexArray);
+    device.destroyProgram(program);
+    device.destroyProgram(quadProgram);
+    fontItalic.destroy();
+    fontRegular.destroy();
+
     heapAllocator.dumpFreeList();
 
     glfwDestroyWindow(window);

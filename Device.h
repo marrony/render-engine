@@ -6,7 +6,7 @@
 #define DEVICE_H_H
 
 struct Sampler {
-    GLuint sampler;
+    GLuint id;
 };
 
 struct Texture2D {
@@ -65,6 +65,30 @@ struct VertexDeclarationDesc {
 
 class Device {
 public:
+    Device() {
+        vertexBufferCount = 0;
+        indexBufferCount = 0;
+        constantBufferCount = 0;
+        vertexArrayCount = 0;
+        textureCount = 0;
+        samplerCount = 0;
+        programCount = 0;
+        framebufferCount = 0;
+        renderbufferCount = 0;
+    }
+
+    ~Device() {
+        assert(vertexBufferCount == 0);
+        assert(indexBufferCount == 0);
+        assert(constantBufferCount == 0);
+        assert(vertexArrayCount == 0);
+        assert(textureCount == 0);
+        assert(samplerCount == 0);
+        assert(programCount == 0);
+        assert(framebufferCount == 0);
+        assert(renderbufferCount == 0);
+    }
+
     VertexBuffer createDynamicVertexBuffer(size_t size, const void* data) {
         GLuint vbo;
 
@@ -332,6 +356,12 @@ public:
             exit(-1);
         }
 
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+        if(geometryShader != 0) {
+            glDeleteShader(geometryShader);
+        }
+
         programCount++;
 
         return {program};
@@ -359,6 +389,70 @@ public:
 
         return {id};
     }
+
+    //////////////////////////////////////////////////
+
+    void destroyTexture(Texture2D texture) {
+        glDeleteTextures(1, &texture.id);
+
+        textureCount--;
+    }
+
+    void destroyTexture(DepthStencilTexture texture) {
+        glDeleteTextures(1, &texture.id);
+
+        textureCount--;
+    }
+
+    void destroySampler(Sampler sampler) {
+        glDeleteSamplers(1, &sampler.id);
+
+        samplerCount--;
+    }
+
+    void destroyVertexBuffer(VertexBuffer vertexBuffer) {
+        glDeleteBuffers(1, &vertexBuffer.id);
+
+        vertexBufferCount--;
+    }
+
+    void destroyIndexBuffer(IndexBuffer indexBuffer) {
+        glDeleteBuffers(1, &indexBuffer.id);
+
+        indexBufferCount--;
+    }
+
+    void destroyConstantBuffer(ConstantBuffer constantBuffer) {
+        glDeleteBuffers(1, &constantBuffer.id);
+
+        constantBufferCount--;
+    }
+
+    void destroyVertexArray(VertexArray vertexArray) {
+        glDeleteVertexArrays(1, &vertexArray.id);
+
+        vertexArrayCount--;
+    }
+
+    void destroyProgram(Program program) {
+        glDeleteProgram(program.id);
+
+        programCount--;
+    }
+
+    void destoryRenderbuffer(Renderbuffer renderbuffer) {
+        glDeleteRenderbuffers(1, &renderbuffer.id);
+
+        renderbufferCount--;
+    }
+
+    void destroyFramebuffer(Framebuffer framebuffer) {
+        glDeleteFramebuffers(1, &framebuffer.id);
+
+        framebufferCount--;
+    }
+
+    //////////////////////////////////////////////////
 
     void bindTextureToFramebuffer(Framebuffer framebuffer, Texture2D texture, int index) {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
@@ -449,7 +543,7 @@ public:
     }
 
     void bindSampler(Sampler sampler, int unit) {
-        glBindSampler(unit, sampler.sampler); CHECK_ERROR;
+        glBindSampler(unit, sampler.id); CHECK_ERROR;
     }
 
     void drawTriangles(int offset, int count) {
