@@ -8,28 +8,23 @@
 struct Mesh {
     CommandBuffer* draw;
 
-    static Mesh* create(HeapAllocator& allocator, int offset, int count) {
-        Mesh* mesh = (Mesh*) allocator.allocate(sizeof(Mesh));
-
+    static void create(HeapAllocator& allocator, Mesh* mesh, int offset, int count) {
         mesh->draw = CommandBuffer::create(allocator, 1);
         DrawTriangles::create(mesh->draw, offset, count);
-
-        return mesh;
     }
 
     static void destroy(HeapAllocator& allocator, Mesh* mesh) {
         allocator.deallocate(mesh->draw);
-        allocator.deallocate(mesh);
     }
 };
 
 struct Model {
     CommandBuffer* state;
     int meshCount;
-    Mesh* meshes[];
+    Mesh meshes[];
 
     static Model* create(HeapAllocator& allocator, VertexArray vertexArray, int meshCount) {
-        Model* model = (Model*) allocator.allocate(sizeof(Model) + meshCount * sizeof(Mesh*));
+        Model* model = (Model*) allocator.allocate(sizeof(Model) + meshCount * sizeof(Mesh));
 
         model->state = CommandBuffer::create(allocator, 1);
         BindVertexArray::create(model->state, vertexArray);
@@ -41,7 +36,7 @@ struct Model {
     static void destroy(HeapAllocator& allocator, Model* model) {
         allocator.deallocate(model->state);
         for(int i = 0; i < model->meshCount; i++)
-            Mesh::destroy(allocator, model->meshes[i]);
+            Mesh::destroy(allocator, &model->meshes[i]);
         allocator.deallocate(model);
     }
 };
@@ -73,7 +68,7 @@ struct ModelInstance {
 
     void draw(uint64_t key, RenderQueue& renderQueue, CommandBuffer* globalState) {
         for (int i = 0; i < model->meshCount; i++) {
-            Mesh* mesh = model->meshes[i];
+            Mesh* mesh = &model->meshes[i];
             Material* material = materials[i];
 
             CommandBuffer* commandBuffers[] = {

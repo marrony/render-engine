@@ -75,6 +75,8 @@ public:
 
         glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_ERROR;
 
+        vertexBufferCount++;
+
         return {vbo};
     }
 
@@ -88,6 +90,8 @@ public:
 
         glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_ERROR;
 
+        vertexBufferCount++;
+
         return {vbo};
     }
 
@@ -100,6 +104,8 @@ public:
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, size, data, GL_STATIC_DRAW); CHECK_ERROR;
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0); CHECK_ERROR;
+
+        indexBufferCount++;
 
         return {ibo};
     }
@@ -115,6 +121,8 @@ public:
         glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, cbo); CHECK_ERROR;
 
         glBindBuffer(GL_UNIFORM_BUFFER, 0); CHECK_ERROR;
+
+        constantBufferCount++;
 
         return {cbo};
     }
@@ -148,6 +156,8 @@ public:
 
         glBindVertexArray(0);
 
+        vertexArrayCount++;
+
         return {vao};
     }
 
@@ -159,6 +169,8 @@ public:
         glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
         glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, type); CHECK_ERROR;
         glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, type); CHECK_ERROR;
+
+        samplerCount++;
 
         return {sampler};
     }
@@ -175,6 +187,8 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        textureCount++;
+
         return {texId};
     }
 
@@ -189,6 +203,8 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR; CHECK_ERROR;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        textureCount++;
 
         return {texId};
     }
@@ -208,6 +224,26 @@ public:
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
 
+        textureCount++;
+
+        return {texId};
+    }
+
+    Texture2D createRTexture(int width, int height, const void* pixels) {
+        GLuint texId;
+        glGenTextures(1, &texId); CHECK_ERROR;
+
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        textureCount++;
+
         return {texId};
     }
 
@@ -219,6 +255,8 @@ public:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0,
                      GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        textureCount++;
 
         return {texId};
     }
@@ -294,6 +332,8 @@ public:
             exit(-1);
         }
 
+        programCount++;
+
         return {program};
     }
 
@@ -301,6 +341,21 @@ public:
         GLuint id;
 
         glGenFramebuffers(1, &id); CHECK_ERROR;
+
+        framebufferCount++;
+
+        return {id};
+    }
+
+    Renderbuffer createRenderbuffer(int width, int height) {
+        GLuint id;
+
+        glGenRenderbuffers(1, &id); CHECK_ERROR;
+        glBindRenderbuffer(GL_RENDERBUFFER, id); CHECK_ERROR;
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height); CHECK_ERROR;
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+        renderbufferCount++;
 
         return {id};
     }
@@ -315,17 +370,6 @@ public:
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture.id, 0); CHECK_ERROR;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
-    Renderbuffer createRenderbuffer(int width, int height) {
-        GLuint id;
-
-        glGenRenderbuffers(1, &id); CHECK_ERROR;
-        glBindRenderbuffer(GL_RENDERBUFFER, id); CHECK_ERROR;
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height); CHECK_ERROR;
-        glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-        return {id};
     }
 
     void bindRenderbufferToFramebuffer(Framebuffer framebuffer, Renderbuffer renderbuffer) {
@@ -419,6 +463,17 @@ public:
 
         glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset, instance); CHECK_ERROR;
     }
+
+private:
+    uint32_t vertexBufferCount;
+    uint32_t indexBufferCount;
+    uint32_t constantBufferCount;
+    uint32_t vertexArrayCount;
+    uint32_t textureCount;
+    uint32_t samplerCount;
+    uint32_t programCount;
+    uint32_t framebufferCount;
+    uint32_t renderbufferCount;
 };
 
 #endif //DEVICE_H_H

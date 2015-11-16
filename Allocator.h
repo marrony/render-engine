@@ -38,13 +38,13 @@ public:
     HeapAllocator() : freeList(nullptr), bytesAllocated(0), numberAllocations(0) { }
 
     ~HeapAllocator() {
+        assert(numberAllocations == 0);
+        assert(bytesAllocated == 0);
+
         clearMemory();
     }
 
     void clearMemory() {
-        assert(numberAllocations == 0);
-        assert(bytesAllocated == 0);
-
         while(freeList) {
             void* ptr = freeList;
 
@@ -123,12 +123,13 @@ public:
     }
 private:
     size_t roundSize(size_t size) {
-        size_t blocks = size / 128;
+        const size_t blockSize = 128;
+        size_t blocks = size / blockSize;
 
-        if((size % 128) != 0)
+        if((size % blockSize) != 0)
             blocks++;
 
-        return blocks * 128;
+        return blocks * blockSize;
     }
 
     struct FreeList {

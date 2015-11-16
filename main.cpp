@@ -395,12 +395,12 @@ int main(int argc, char* argv[]) {
     VertexArray vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
 
     Model* model0 = Model::create(heapAllocator, vertexArray, 1);
-    model0->meshes[0] = Mesh::create(heapAllocator, 0, 3);
+    Mesh::create(heapAllocator, &model0->meshes[0], 0, 3);
     ModelInstance* modelInstance0 = ModelInstance::create(heapAllocator, model0);
     modelInstance0->materials[0] = material0;
 
     Model* model1 = Model::create(heapAllocator, vertexArray, 1);
-    model1->meshes[0] = Mesh::create(heapAllocator, 3, 3);
+    Mesh::create(heapAllocator, &model1->meshes[0], 3, 3);
     ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model1);
     modelInstance1->materials[0] = material1;
 
