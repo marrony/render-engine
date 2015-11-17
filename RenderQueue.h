@@ -26,8 +26,13 @@ struct RenderGroup {
 
 class RenderQueue {
 public:
-    RenderQueue(Device& device) : device(device), itemsCount(0) {
-        items = new RenderItem[1024];
+    RenderQueue(Device& device, HeapAllocator& allocator)
+            : device(device), allocator(allocator), itemsCount(0) {
+        items = (RenderItem*) allocator.allocate(sizeof(RenderItem) * 1024);
+    }
+
+    ~RenderQueue() {
+        allocator.deallocate(items);
     }
 
     void submit(uint64_t key, CommandBuffer** commandBuffer, int commandBufferCount) {
@@ -121,6 +126,8 @@ private:
     }
 
     Device& device;
+    HeapAllocator& allocator;
+
     int itemsCount;
     RenderItem* items;
     int executedCommands;

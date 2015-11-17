@@ -30,48 +30,14 @@ const char* fragmentFontSource = STR(
         }
 );
 
-//TODO Make different fonts use same programs/vertexBuffers/indexBuffer
-class Font {
+struct Font {
+    int id;
+};
+
+class TextManager {
 public:
-    Font(Device& device, const char* fontFace) : device(device) {
-        FT_Library ft;
-        if (FT_Init_FreeType(&ft)) {
-            printf("Could not init FreeType Library\n");
-            exit(-1);
-        }
-
-        FT_Face face;
-        if (FT_New_Face(ft, fontFace, 0, &face)) {
-            printf("Failed to load font\n");
-            exit(-1);
-        }
-
-        FT_Set_Pixel_Sizes(face, 0, 48);
-
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-        for (int ch = 0; ch < 128; ch++) {
-            if (FT_Load_Char(face, ch, FT_LOAD_RENDER)) {
-                printf("Failed to load Glyph\n");
-                continue;
-            }
-
-            Texture2D texture = device.createRTexture(face->glyph->bitmap.width,
-                                                      face->glyph->bitmap.rows,
-                                                      face->glyph->bitmap.buffer);
-            characters[ch].texture = texture;
-            characters[ch].size[0] = face->glyph->bitmap.width;
-            characters[ch].size[1] = face->glyph->bitmap.rows;
-            characters[ch].bearing[0] = face->glyph->bitmap_left;
-            characters[ch].bearing[1] = face->glyph->bitmap_top;
-            characters[ch].advance = face->glyph->advance.x >> 6;
-        }
-
-        FT_Done_Face(face);
-        FT_Done_FreeType(ft);
-
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
+    TextManager(HeapAllocator& allocator, Device& device)
+            :  allocator(allocator), device(device), fontCount(0) {
         vertexBuffer = device.createDynamicVertexBuffer(sizeof(float) * 4 * 4, nullptr);
 
         VertexDeclarationDesc vertexDeclaration[1] = {};
@@ -85,9 +51,14 @@ public:
         program = device.createProgram(vertexFontSource, fragmentFontSource);
     }
 
-    void destroy() {
-        for (int ch = 0; ch < 128; ch++) {
-            device.destroyTexture(characters[ch].texture);
+    ~TextManager() {
+        for(int i = 0; i < fontCount; i++) {
+            FontFace* font = fonts[i];
+
+            for(int ch = 0; ch < 128; ch++)
+                device.destroyTexture(font->characters[ch].texture);
+
+            allocator.deallocate(font);
         }
 
         device.destroyVertexBuffer(vertexBuffer);
@@ -95,7 +66,7 @@ public:
         device.destroyProgram(program);
     }
 
-    void printText(float x, float y, const char* fmt, ...) {
+    void printText(Font fontId, float x, float y, const char* fmt, ...) {
         char text[1024];
 
         va_list list;
@@ -114,7 +85,6 @@ public:
         GLFWwindow* window = glfwGetCurrentContext();
         glfwGetFramebufferSize(window, &width, &height);
 
-        GLfloat viewport[4];
         glViewport(0, 0, width, height);
 
         float invw = 1.0f / width;
@@ -128,9 +98,11 @@ public:
 
         int in_Sampler = device.getUniformLocation(program, "in_Sampler");
 
+        FontFace* font = fonts[fontId.id];
+
         float scale = 1.0;
         for (size_t i = 0; i < size; i++) {
-            Character& ch = characters[text[i]];
+            Character& ch = font->characters[text[i]];
 
             GLfloat xpos = x + ch.bearing[0] * scale;
             GLfloat ypos = y - (ch.size[1] - ch.bearing[1]) * scale;
@@ -151,19 +123,11 @@ public:
                 vertices[i][1] = (vertices[i][1] * invh * 2.0f) - 1.0f;
             }
 
+            device.updateVertexBuffer(vertexBuffer, 0, sizeof(vertices), vertices);
+
             device.bindTexture(program, ch.texture, in_Sampler);
 
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id);
-            check_error(__FILE__, __LINE__);
-
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-            check_error(__FILE__, __LINE__);
-
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-            check_error(__FILE__, __LINE__);
-
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-            check_error(__FILE__, __LINE__);
+            device.drawArraysTriangleStrip(0, 4);
 
             x += ch.advance * scale;
         }
@@ -171,6 +135,60 @@ public:
         glDisable(GL_BLEND);
     }
 
+    Font loadFont(const char* fontface, int height) {
+        for(int i = 0; i < fontCount; i++) {
+            if(strcmp(fontface, fonts[i]->fontface) == 0 && height == fonts[i]->height)
+                return {i};
+        }
+
+        FontFace* font = (FontFace*) allocator.allocate(sizeof(FontFace));
+        int fontId = fontCount++;
+
+        fonts[fontId] = font;
+
+        FT_Library ft;
+        if (FT_Init_FreeType(&ft)) {
+            printf("Could not init FreeType Library\n");
+            exit(-1);
+        }
+
+        FT_Face face;
+        if (FT_New_Face(ft, fontface, 0, &face)) {
+            printf("Failed to load font\n");
+            exit(-1);
+        }
+
+        FT_Set_Pixel_Sizes(face, 0, height);
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        font->fontface = fontface;
+        font->height = height;
+
+        for (int ch = 0; ch < 128; ch++) {
+            if (FT_Load_Char(face, ch, FT_LOAD_RENDER)) {
+                printf("Failed to load Glyph\n");
+                continue;
+            }
+
+            Texture2D texture = device.createRTexture(face->glyph->bitmap.width,
+                                                      face->glyph->bitmap.rows,
+                                                      face->glyph->bitmap.buffer);
+            font->characters[ch].texture = texture;
+            font->characters[ch].size[0] = face->glyph->bitmap.width;
+            font->characters[ch].size[1] = face->glyph->bitmap.rows;
+            font->characters[ch].bearing[0] = face->glyph->bitmap_left;
+            font->characters[ch].bearing[1] = face->glyph->bitmap_top;
+            font->characters[ch].advance = face->glyph->advance.x >> 6;
+        }
+
+        FT_Done_Face(face);
+        FT_Done_FreeType(ft);
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        return {fontId};
+    }
 private:
     struct Character {
         Texture2D texture;
@@ -179,11 +197,21 @@ private:
         int advance;
     };
 
+    struct FontFace {
+        int height;
+        const char* fontface;
+        Character characters[128];
+    };
+
+    HeapAllocator& allocator;
     Device& device;
-    Character characters[255];
+
     VertexArray vertexArray;
     VertexBuffer vertexBuffer;
     Program program;
+
+    FontFace* fonts[10];
+    int fontCount;
 };
 
 #endif //TEXT_H

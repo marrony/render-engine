@@ -244,8 +244,6 @@ public:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
 
-        GLfloat color[] = {1.0f, 1.0f, 1.0f, 1.0f};
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, color); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, 0);
 
         textureCount++;
@@ -496,7 +494,6 @@ public:
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     }
 
-
     bool isFramebufferComplete(Framebuffer framebuffer) {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id);
 
@@ -556,6 +553,16 @@ public:
         void* _offset = (void*) (offset * sizeof(uint16_t));
 
         glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset, instance); CHECK_ERROR;
+    }
+
+    void drawArraysTriangleStrip(int first, int count) {
+        glDrawArrays(GL_TRIANGLE_STRIP, first, count); CHECK_ERROR;
+    }
+
+    void updateVertexBuffer(VertexBuffer vertexBuffer, size_t offset, size_t size, const void* data) {
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id); CHECK_ERROR;
+        glBufferSubData(GL_ARRAY_BUFFER, offset, size, data); CHECK_ERROR;
+        glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_ERROR;
     }
 
 private:

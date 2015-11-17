@@ -285,8 +285,10 @@ int main(int argc, char* argv[]) {
 
     Device device;
 
-    Font fontRegular(device, "./fonts/OpenSans-Regular.ttf");
-    Font fontItalic(device, "./fonts/OpenSans-Italic.ttf");
+    TextManager textManager(heapAllocator, device);
+
+    Font fontRegular = textManager.loadFont("./fonts/OpenSans-Regular.ttf", 48);
+    Font fontItalic = textManager.loadFont("./fonts/OpenSans-Italic.ttf", 48);
 
     Program program = device.createProgram(vertexSource, fragmentSource, geometrySource);
 
@@ -409,7 +411,7 @@ int main(int argc, char* argv[]) {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    RenderQueue renderQueue(device);
+    RenderQueue renderQueue(device, heapAllocator);
 
     int wgbuffer = 512;
     int hgbuffer = 512;
@@ -518,13 +520,13 @@ int main(int argc, char* argv[]) {
 
         CommandBuffer::execute(commandBuffer, device);
 
-        fontItalic.printText(10, 230, "My font example");
-        fontItalic.printText(10, 180, "viewport: %d %d %d %d", viewport.x, viewport.y, viewport.width, viewport.height);
-        fontRegular.printText(10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
+        textManager.printText(fontItalic, 10, 230, "My font example");
+        textManager.printText(fontRegular, 10, 180, "viewport: %d %d %d %d", viewport.x, viewport.y, viewport.width, viewport.height);
+        textManager.printText(fontRegular, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
-        fontRegular.printText(10, 80, "Executed commands %d | %.2f%% executed",
+        textManager.printText(fontRegular, 10, 80, "Executed commands %d | %.2f%% executed",
                               renderQueue.getExecutedCommands(), renderQueue.getExecutedCommands() / totalCommands * 100);
-        fontRegular.printText(10, 30, "Skipped commands %d | %.2f%% ignored",
+        textManager.printText(fontRegular, 10, 30, "Skipped commands %d | %.2f%% ignored",
                               renderQueue.getSkippedCommands(), renderQueue.getSkippedCommands() / totalCommands * 100);
 
         glfwSwapBuffers(window);
@@ -563,8 +565,6 @@ int main(int argc, char* argv[]) {
     device.destroyVertexArray(quadVertexArray);
     device.destroyProgram(program);
     device.destroyProgram(quadProgram);
-    fontItalic.destroy();
-    fontRegular.destroy();
 
     heapAllocator.dumpFreeList();
 
