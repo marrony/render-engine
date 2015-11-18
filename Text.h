@@ -111,11 +111,11 @@ public:
             GLfloat h = ch.size[1] * scale;
 
             GLfloat vertices[4][4] = {
-                    {xpos,     ypos + h, 0.0, 0.0},
                     {xpos,     ypos,     0.0, 1.0},
+                    {xpos,     ypos + h, 0.0, 0.0},
 
-                    {xpos + w, ypos + h, 1.0, 0.0},
                     {xpos + w, ypos,     1.0, 1.0},
+                    {xpos + w, ypos + h, 1.0, 0.0},
             };
 
             for (int i = 0; i < 6; i++) {

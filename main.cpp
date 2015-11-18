@@ -57,6 +57,7 @@ void check_error(const char* file, int line) {
 #include "RenderQueue.h"
 #include "Text.h"
 #include "Model.h"
+#include "Shapes.h"
 
 const char* vertexSource = STR(
         layout(location = 0) in vec3 in_Position;
@@ -70,17 +71,19 @@ const char* vertexSource = STR(
             uniform float in_Scale[4];
         };
 
-        out vec3 vtx_Position;
-        out vec3 vtx_Normal;
-        out vec2 vtx_Texture;
-        out vec4 vtx_Color;
+        out VertexData {
+            vec3 position;
+            vec3 normal;
+            vec2 texture;
+            vec4 color;
+        } vtx;
 
         void main() {
-            vtx_Position = in_Rotation * in_Position * in_Scale[gl_InstanceID];
-            gl_Position = vec4(vtx_Position, 1);
-            vtx_Texture = in_Texture;
-            vtx_Normal = in_Normal;
-            vtx_Color = vec4(in_Color, 1);
+            vtx.position = in_Rotation * in_Position;// * in_Scale[gl_InstanceID];
+            gl_Position = vec4(vtx.position, 1);
+            vtx.texture = in_Texture;
+            vtx.normal = in_Rotation * in_Normal;
+            vtx.color = vec4(in_Color, 1) * in_Color2;
         }
 );
 
@@ -88,36 +91,41 @@ const char* geometrySource = STR(
         layout (triangles) in;
         layout (triangle_strip, max_vertices=3) out;
 
-        in vec3 vtx_Position[];
-        in vec3 vtx_Normal[];
-        in vec2 vtx_Texture[];
-        in vec4 vtx_Color[];
+        in VertexData {
+            vec3 position;
+            vec3 normal;
+            vec2 texture;
+            vec4 color;
+        } vtx[];
 
-        out vec3 geo_Position;
-        out vec3 geo_Normal;
-        out vec2 geo_Texture;
-        out vec4 geo_Color;
+
+        out GeometryData {
+            vec3 position;
+            vec3 normal;
+            vec2 texture;
+            vec4 color;
+        } geo;
 
         void main() {
             gl_Position = gl_in[0].gl_Position;
-            geo_Position = vtx_Position[0];
-            geo_Normal = vtx_Normal[0];
-            geo_Texture = vtx_Texture[0];
-            geo_Color = vtx_Color[0];
+            geo.position = vtx[0].position;
+            geo.normal = vtx[0].normal;
+            geo.texture = vtx[0].texture;
+            geo.color = vtx[0].color;
             EmitVertex();
 
             gl_Position = gl_in[1].gl_Position;
-            geo_Position = vtx_Position[1];
-            geo_Normal = vtx_Normal[1];
-            geo_Texture = vtx_Texture[1];
-            geo_Color = vtx_Color[1];
+            geo.position = vtx[1].position;
+            geo.normal = vtx[1].normal;
+            geo.texture = vtx[1].texture;
+            geo.color = vtx[1].color;
             EmitVertex();
 
             gl_Position = gl_in[2].gl_Position;
-            geo_Position = vtx_Position[2];
-            geo_Normal = vtx_Normal[2];
-            geo_Texture = vtx_Texture[2];
-            geo_Color = vtx_Color[2];
+            geo.position = vtx[2].position;
+            geo.normal = vtx[2].normal;
+            geo.texture = vtx[2].texture;
+            geo.color = vtx[2].color;
             EmitVertex();
 
             EndPrimitive();
@@ -125,10 +133,19 @@ const char* geometrySource = STR(
 );
 
 const char* fragmentSource = STR(
-        in vec3 geo_Position;
-        in vec3 geo_Normal;
-        in vec2 geo_Texture;
-        in vec4 geo_Color;
+        in VertexData {
+            vec3 position;
+            vec3 normal;
+            vec2 texture;
+            vec4 color;
+        } vtx;
+
+        in GeometryData {
+            vec3 position;
+            vec3 normal;
+            vec2 texture;
+            vec4 color;
+        } geo;
 
         layout(std140) uniform in_ShaderData {
             uniform mat3 in_Rotation;
@@ -143,9 +160,9 @@ const char* fragmentSource = STR(
         layout(location = 2) out vec4 out_Albedo;
 
         void main() {
-            out_Position = geo_Position;
-            out_Normal = normalize(geo_Normal);
-            out_Albedo.rgb = (texture(in_Sampler, geo_Texture)).rgb; // * geo_Color * in_Color2).rgb;
+            out_Position = vtx.position;
+            out_Normal = normalize(vtx.normal);
+            out_Albedo.rgb = (texture(in_Sampler, vtx.texture)).rgb; // * vtx.color * in_Color2).rgb;
             out_Albedo.w = 1;
         }
 );
@@ -202,20 +219,14 @@ const char* quadFragmentSource = STR(
 
         vec3 calculateLight(vec3 position, vec3 normal, vec4 albedo, vec3 lightPos, vec3 lightColor) {
             vec3 lightVec = lightPos - position;
-
-            if(length(lightVec) < 1.5) {
-                vec3 lightDir = normalize(lightVec);
-                return max(dot(normal, lightDir), 0) * albedo.rgb * lightColor;
-            }
-
-            return vec3(0);
+            vec3 lightDir = normalize(lightVec);
+            return max(dot(normal, lightDir), 0) * albedo.rgb * lightColor;
         }
 
         void main() {
-            vec3 vewPos = vec3(0, 0, 0);
-            vec3 lightPos0 = vec3(0, 1.2, 1);
-            vec3 lightPos1 = vec3(+1.2, 0, 1);
-            vec3 lightPos2 = vec3(-1.2, 0, 1);
+            vec3 lightPos0 = vec3(0, 1.2, -1);
+            vec3 lightPos1 = vec3(+1.2, 0, -1);
+            vec3 lightPos2 = vec3(-1.2, 0, -1);
 
             vec3 position = texture(in_Position, geo_Texture).rgb;
             vec3 normal = texture(in_Normal, geo_Texture).rgb;
@@ -290,7 +301,7 @@ int main(int argc, char* argv[]) {
     Font fontRegular = textManager.loadFont("./fonts/OpenSans-Regular.ttf", 48);
     Font fontItalic = textManager.loadFont("./fonts/OpenSans-Italic.ttf", 48);
 
-    Program program = device.createProgram(vertexSource, fragmentSource, geometrySource);
+    Program program = device.createProgram(vertexSource, fragmentSource, nullptr);
 
     struct {
         float in_Rotation[12];
@@ -314,7 +325,7 @@ int main(int argc, char* argv[]) {
     device.setConstantBufferBinding(program, "in_ShaderData", bindingPoint);
     ConstantBuffer constantBuffer = device.createConstantBuffer(sizeof(in_vertexData), &in_vertexData, bindingPoint);
 
-    const uint32_t black = 0xff000000;
+    const uint32_t black = 0xff101010;
     const uint32_t white = 0xffffffff;
 
     const uint32_t pixels0[] = {
@@ -341,6 +352,7 @@ int main(int argc, char* argv[]) {
     Sampler sampler1 = device.createSampler(GL_LINEAR);
     Material* material1 = Material::create(heapAllocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
 
+#if 0
     float vertexData[] = {
             -0.5, -0.5, 0.0,
             -0.5, +0.5, 0.0,
@@ -366,50 +378,67 @@ int main(int argc, char* argv[]) {
             1, 1, 1,
     };
     uint16_t indexData[] = {0, 1, 3, 3, 1, 2};
+    int indexSize = 6;
 
     VertexBuffer vertexBuffer = device.createStaticVertexBuffer(sizeof(vertexData), vertexData);
     VertexBuffer normalBuffer = device.createStaticVertexBuffer(sizeof(normalData), normalData);
     VertexBuffer textureBuffer = device.createStaticVertexBuffer(sizeof(textureData), textureData);
     VertexBuffer colorBuffer = device.createStaticVertexBuffer(sizeof(colorData), colorData);
     IndexBuffer indexBuffer = device.createIndexBuffer(sizeof(indexData), indexData);
+#else
+    std::vector<Vector3> vertexData;
+    std::vector<Vector3> normalData;
+    std::vector<Vector2> textureData;
+    std::vector<Vector3> colorData;
+    std::vector<uint16_t> indexData;
+
+    createSphere(0.5, 20, vertexData, normalData, textureData, colorData, indexData);
+    int indexSize = indexData.size();
+
+    VertexBuffer vertexBuffer = device.createStaticVertexBuffer(vertexData.size()*sizeof(Vector3), vertexData.data());
+    VertexBuffer normalBuffer = device.createStaticVertexBuffer(normalData.size()*sizeof(Vector3), normalData.data());
+    VertexBuffer textureBuffer = device.createStaticVertexBuffer(textureData.size()*sizeof(Vector2), textureData.data());
+    VertexBuffer colorBuffer = device.createStaticVertexBuffer(colorData.size()*sizeof(Vector3), colorData.data());
+    IndexBuffer indexBuffer = device.createIndexBuffer(indexData.size()*sizeof(uint16_t), indexData.data());
+#endif
 
     VertexDeclarationDesc vertexDeclaration[4] = {};
     vertexDeclaration[0].buffer = vertexBuffer;
     vertexDeclaration[0].format = VertexFloat3;
     vertexDeclaration[0].offset = 0;
-    vertexDeclaration[0].stride = 0;//sizeof(float)*3;
+    vertexDeclaration[0].stride = 0;
 
     vertexDeclaration[1].buffer = normalBuffer;
     vertexDeclaration[1].format = VertexFloat3;
     vertexDeclaration[1].offset = 0;
-    vertexDeclaration[1].stride = 0;//sizeof(float)*3;
+    vertexDeclaration[1].stride = 0;
 
     vertexDeclaration[2].buffer = textureBuffer;
     vertexDeclaration[2].format = VertexFloat2;
     vertexDeclaration[2].offset = 0;
-    vertexDeclaration[2].stride = 0;//sizeof(float)*2;
+    vertexDeclaration[2].stride = 0;
 
     vertexDeclaration[3].buffer = colorBuffer;
     vertexDeclaration[3].format = VertexFloat3;
     vertexDeclaration[3].offset = 0;
-    vertexDeclaration[3].stride = 0;//sizeof(float)*3;
+    vertexDeclaration[3].stride = 0;
 
-    VertexArray vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
+    VertexArray vertexArray = device.createVertexArray(vertexDeclaration, 3, indexBuffer);
 
     Model* model0 = Model::create(heapAllocator, vertexArray, 1);
-    Mesh::create(heapAllocator, &model0->meshes[0], 0, 3);
+    Mesh::create(heapAllocator, &model0->meshes[0], 0, indexSize);
     ModelInstance* modelInstance0 = ModelInstance::create(heapAllocator, model0);
     modelInstance0->materials[0] = material0;
 
-    Model* model1 = Model::create(heapAllocator, vertexArray, 1);
-    Mesh::create(heapAllocator, &model1->meshes[0], 3, 3);
-    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model1);
-    modelInstance1->materials[0] = material1;
+//    Model* model1 = Model::create(heapAllocator, vertexArray, 1);
+//    Mesh::create(heapAllocator, &model1->meshes[0], 3, 3);
+//    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model1);
+//    modelInstance1->materials[0] = material1;
 
-    int width = 0;
-    int height = 0;
-    glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
+    viewport.x = 0;
+    viewport.y = 0;
+    glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
+    glViewport(0, 0, viewport.width, viewport.height);
 
     RenderQueue renderQueue(device, heapAllocator);
 
@@ -467,20 +496,17 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 4);
+    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 5);
     CopyConstantBuffer::create(setGBuffer, constantBuffer, &in_vertexData, sizeof(in_vertexData));
     BindFramebuffer::create(setGBuffer, gBuffer);
     SetViewport::create(setGBuffer, &gBufferViewport);
     ClearColor::create(setGBuffer, 0.25, 0.25, 0.25, 1);
+    SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
 
-    viewport.x = 0;
-    viewport.y = 0;
-    viewport.width = width;
-    viewport.height = height;
-
-    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 8);
+    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 9);
     BindFramebuffer::create(drawQuad, nullFramebuffer);
     SetViewport::create(drawQuad, &viewport);
+    SetDepthTest::create(drawQuad, false, 0);
     BindProgram::create(drawQuad, quadProgram);
     BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
     BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
@@ -489,11 +515,14 @@ int main(int argc, char* argv[]) {
     DrawTriangles::create(drawQuad, 0, 6);
 
     modelInstance0->draw(2, renderQueue, setGBuffer);
-    modelInstance1->draw(1, renderQueue, setGBuffer);
+    //modelInstance1->draw(1, renderQueue, setGBuffer);
 
     renderQueue.submit(3, &drawQuad, 1);
 
     CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer(heapAllocator);
+
+    glEnable(GL_CULL_FACE); CHECK_ERROR;
+    glCullFace(GL_FRONT); CHECK_ERROR;
 
     float angle = 0;
     while (!glfwWindowShouldClose(window)) {
@@ -502,17 +531,23 @@ int main(int argc, char* argv[]) {
 
         angle += 0.005;
 
-        //rotate z-axis
-        in_vertexData.in_Rotation[0] = cos;
-        in_vertexData.in_Rotation[1] = -sin;
-        in_vertexData.in_Rotation[4] = sin;
+        //rotate x-axis
         in_vertexData.in_Rotation[5] = cos;
+        in_vertexData.in_Rotation[6] = -sin;
+        in_vertexData.in_Rotation[9] = sin;
+        in_vertexData.in_Rotation[10] = cos;
+
+        //rotate z-axis
+//        in_vertexData.in_Rotation[0] = cos;
+//        in_vertexData.in_Rotation[1] = -sin;
+//        in_vertexData.in_Rotation[4] = sin;
+//        in_vertexData.in_Rotation[5] = cos;
 
         //rotate y-axis
 //        in_vertexData.in_Rotation[0] = cos;
 //        in_vertexData.in_Rotation[2] = sin;
-//        in_vertexData.in_Rotation[7] = -sin;
-//        in_vertexData.in_Rotation[9] = cos;
+//        in_vertexData.in_Rotation[8] = -sin;
+//        in_vertexData.in_Rotation[10] = cos;
 
         in_vertexData.in_Color2[0] -= 0.00001;
         in_vertexData.in_Color2[1] -= 0.00002;
@@ -520,7 +555,7 @@ int main(int argc, char* argv[]) {
 
         CommandBuffer::execute(commandBuffer, device);
 
-        textManager.printText(fontItalic, 10, 230, "My font example");
+        textManager.printText(fontItalic, 10, 230, "Angle: %f", angle);
         textManager.printText(fontRegular, 10, 180, "viewport: %d %d %d %d", viewport.x, viewport.y, viewport.width, viewport.height);
         textManager.printText(fontRegular, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
@@ -534,9 +569,9 @@ int main(int argc, char* argv[]) {
     }
 
     Model::destroy(heapAllocator, model0);
-    Model::destroy(heapAllocator, model1);
+    //Model::destroy(heapAllocator, model1);
     ModelInstance::destroy(heapAllocator, modelInstance0);
-    ModelInstance::destroy(heapAllocator, modelInstance1);
+    //ModelInstance::destroy(heapAllocator, modelInstance1);
     Material::destroy(heapAllocator, material0);
     Material::destroy(heapAllocator, material1);
     CommandBuffer::destroy(heapAllocator, setGBuffer);

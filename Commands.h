@@ -13,7 +13,7 @@ enum CommandType {
     DRAW_COMMANDS_MAX = DRAW_TRIANGLES_INSTANCED,
     BIND_FRAMEBUFFER,
     SET_VIEWPORT,
-    SET_VIEWPORT_REL,
+    SET_DEPTH_TEST,
     CLEAR_COLOR,
     COPY_CONSTANT_BUFFER,
     BIND_VERTEX_ARRAY,
@@ -147,6 +147,33 @@ struct SetViewport {
         glEnable(GL_SCISSOR_TEST);
         glViewport(viewport->x, viewport->y, viewport->width, viewport->height);
         glScissor(viewport->x, viewport->y, viewport->width, viewport->height);
+    }
+};
+
+struct SetDepthTest {
+    Command command;
+    bool enable;
+    int function;
+
+    static const uint32_t TYPE = SET_DEPTH_TEST;
+
+    static void create(CommandBuffer* commandBuffer, bool enable, int function) {
+        SetDepthTest* setDepthTest = getCommand<SetDepthTest>(commandBuffer);
+        setDepthTest->enable = enable;
+        setDepthTest->function = function;
+    }
+
+    static void submit(Device& device, SetDepthTest* cmd) {
+        if(cmd->enable) {
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(cmd->function);
+
+            //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        } else {
+            glDisable(GL_DEPTH_TEST);
+
+            //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
     }
 };
 
@@ -286,6 +313,7 @@ const FnSubmitCommand submitCommand[] = {
         [CLEAR_COLOR] = FnSubmitCommand(ClearColor::submit),
         [BIND_FRAMEBUFFER] = FnSubmitCommand(BindFramebuffer::submit),
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
+        [SET_DEPTH_TEST] = FnSubmitCommand(SetDepthTest::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
         [BIND_VERTEX_ARRAY] = FnSubmitCommand(BindVertexArray::submit),
         [BIND_PROGRAM] = FnSubmitCommand(BindProgram::submit),
@@ -301,6 +329,7 @@ const int sizeCommand[] = {
         [CLEAR_COLOR] = sizeof(ClearColor),
         [BIND_FRAMEBUFFER] = sizeof(BindFramebuffer),
         [SET_VIEWPORT] = sizeof(SetViewport),
+        [SET_DEPTH_TEST] = sizeof(SetDepthTest),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
         [BIND_VERTEX_ARRAY] = sizeof(BindVertexArray),
         [BIND_PROGRAM] = sizeof(BindProgram),

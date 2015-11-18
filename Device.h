@@ -52,12 +52,18 @@ struct Viewport {
     int height;
 };
 
-uint32_t VertexFloat2[] = {2, GL_FLOAT};
-uint32_t VertexFloat3[] = {3, GL_FLOAT};
-uint32_t VertexFloat4[] = {4, GL_FLOAT};
+struct VertexFormat {
+    uint32_t size : 16;
+    uint32_t type : 16;
+};
+
+const VertexFormat VertexFloat1 = {1, GL_FLOAT};
+const VertexFormat VertexFloat2 = {2, GL_FLOAT};
+const VertexFormat VertexFloat3 = {3, GL_FLOAT};
+const VertexFormat VertexFloat4 = {4, GL_FLOAT};
 
 struct VertexDeclarationDesc {
-    uint32_t* format;
+    VertexFormat format;
     uint32_t stride;
     void* offset;
     VertexBuffer buffer;
@@ -167,14 +173,14 @@ public:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.id); CHECK_ERROR;
 
         for (int i = 0; i < size; i++) {
-            uint32_t* format = vertexDeclarationDesc[i].format;
+            VertexFormat format = vertexDeclarationDesc[i].format;
             uint32_t stride = vertexDeclarationDesc[i].stride;
             void* offset = vertexDeclarationDesc[i].offset;
             VertexBuffer vertexBuffer = vertexDeclarationDesc[i].buffer;
 
             glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id); CHECK_ERROR;
 
-            glVertexAttribPointer(i, format[0], format[1], GL_FALSE, stride, offset); CHECK_ERROR;
+            glVertexAttribPointer(i, format.size, format.type, GL_FALSE, stride, offset); CHECK_ERROR;
             glEnableVertexAttribArray(i); CHECK_ERROR;
         }
 
