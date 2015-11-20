@@ -16,6 +16,7 @@ enum CommandType {
     SET_DEPTH_TEST,
     CLEAR_COLOR,
     COPY_CONSTANT_BUFFER,
+    BIND_CONSTANT_BUFFER,
     BIND_VERTEX_ARRAY,
     BIND_PROGRAM,
     BIND_TEXTURE0,
@@ -168,11 +169,11 @@ struct SetDepthTest {
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(cmd->function);
 
-            //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         } else {
             glDisable(GL_DEPTH_TEST);
 
-            //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
     }
 };
@@ -194,6 +195,24 @@ struct CopyConstantBuffer {
 
     static void submit(Device& device, CopyConstantBuffer* cmd) {
         device.copyConstantBuffer(cmd->constantBuffer, cmd->data, cmd->size);
+    }
+};
+
+struct BindConstantBuffer {
+    Command command;
+    ConstantBuffer constantBuffer;
+    int bindingPoint;
+
+    static const uint32_t TYPE = BIND_CONSTANT_BUFFER;
+
+    static void create(CommandBuffer* commandBuffer, ConstantBuffer constantBuffer, int bindingPoint) {
+        BindConstantBuffer* bindConstantBuffer = getCommand<BindConstantBuffer>(commandBuffer);
+        bindConstantBuffer->constantBuffer = constantBuffer;
+        bindConstantBuffer->bindingPoint = bindingPoint;
+    }
+
+    static void submit(Device& device, BindConstantBuffer* cmd) {
+        glBindBufferBase(GL_UNIFORM_BUFFER, cmd->bindingPoint, cmd->constantBuffer.id); CHECK_ERROR;
     }
 };
 
@@ -315,6 +334,7 @@ const FnSubmitCommand submitCommand[] = {
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
         [SET_DEPTH_TEST] = FnSubmitCommand(SetDepthTest::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
+        [BIND_CONSTANT_BUFFER] = FnSubmitCommand(BindConstantBuffer::submit),
         [BIND_VERTEX_ARRAY] = FnSubmitCommand(BindVertexArray::submit),
         [BIND_PROGRAM] = FnSubmitCommand(BindProgram::submit),
         [BIND_TEXTURE0] = FnSubmitCommand(BindTexture::submit),
@@ -331,6 +351,7 @@ const int sizeCommand[] = {
         [SET_VIEWPORT] = sizeof(SetViewport),
         [SET_DEPTH_TEST] = sizeof(SetDepthTest),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
+        [BIND_CONSTANT_BUFFER] = sizeof(BindConstantBuffer),
         [BIND_VERTEX_ARRAY] = sizeof(BindVertexArray),
         [BIND_PROGRAM] = sizeof(BindProgram),
         [BIND_TEXTURE0] = sizeof(BindTexture),
