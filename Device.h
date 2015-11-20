@@ -140,15 +140,13 @@ public:
         return {ibo};
     }
 
-    ConstantBuffer createConstantBuffer(size_t size, const void* data, int bindingPoint) {
+    ConstantBuffer createConstantBuffer(size_t size) {
         GLuint cbo;
 
         glGenBuffers(1, &cbo); CHECK_ERROR;
 
         glBindBuffer(GL_UNIFORM_BUFFER, cbo); CHECK_ERROR;
-        glBufferData(GL_UNIFORM_BUFFER, size, data, GL_DYNAMIC_DRAW); CHECK_ERROR;
-
-        glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, cbo); CHECK_ERROR;
+        glBufferData(GL_UNIFORM_BUFFER, size, nullptr, GL_DYNAMIC_DRAW); CHECK_ERROR;
 
         glBindBuffer(GL_UNIFORM_BUFFER, 0); CHECK_ERROR;
 
@@ -157,7 +155,7 @@ public:
         return {cbo};
     }
 
-    void setConstantBufferBinding(Program program, const char* blockName, int bindingPoint) {
+    void setConstantBufferBindingPoint(Program program, const char* blockName, int bindingPoint) {
         int index = glGetUniformBlockIndex(program.id, blockName);
         glUniformBlockBinding(program.id, index, bindingPoint); CHECK_ERROR;
     }
@@ -239,12 +237,30 @@ public:
         return {texId};
     }
 
-    Texture2D createTexture(int width, int height, const void* pixels) {
+    Texture2D createRgbaTexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId); CHECK_ERROR;
 
         glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        textureCount++;
+
+        return {texId};
+    }
+
+    Texture2D createRgbTexture(int width, int height, const void* pixels) {
+        GLuint texId;
+        glGenTextures(1, &texId); CHECK_ERROR;
+
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels); CHECK_ERROR;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;

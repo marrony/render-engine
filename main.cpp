@@ -58,6 +58,7 @@ void check_error(const char* file, int line) {
 #include "Text.h"
 #include "Model.h"
 #include "Shapes.h"
+#include "TgaReader.h"
 
 const char* vertexSource = STR(
         layout(location = 0) in vec3 in_Position;
@@ -67,8 +68,8 @@ const char* vertexSource = STR(
 
         layout(std140) uniform in_ShaderData {
             uniform mat3 in_Rotation;
-            uniform vec4 in_Color2;
-            uniform float in_Scale[4];
+            uniform vec4 in_Color2[4];
+            uniform vec4 in_Offset_Scale[4];
         };
 
         out VertexData {
@@ -79,11 +80,14 @@ const char* vertexSource = STR(
         } vtx;
 
         void main() {
-            vtx.position = in_Rotation * in_Position;// * in_Scale[gl_InstanceID];
+            vec3 offset = in_Offset_Scale[gl_InstanceID].xyz;
+            float scale = in_Offset_Scale[gl_InstanceID].w;
+            vtx.position = (in_Rotation * in_Position * scale) + offset;
             gl_Position = vec4(vtx.position, 1);
             vtx.texture = in_Texture;
             vtx.normal = in_Rotation * in_Normal;
-            vtx.color = vec4(in_Color, 1) * in_Color2;
+            //vtx.color = vec4(in_Color, 1);
+            vtx.color = in_Color2[gl_InstanceID];
         }
 );
 
@@ -149,8 +153,8 @@ const char* fragmentSource = STR(
 
         layout(std140) uniform in_ShaderData {
             uniform mat3 in_Rotation;
-            uniform vec4 in_Color2;
-            uniform float in_Scale[4];
+            uniform vec4 in_Color2[4];
+            uniform vec4 in_Offset_Scale[4];
         };
 
         uniform sampler2D in_Sampler;
@@ -160,9 +164,9 @@ const char* fragmentSource = STR(
         layout(location = 2) out vec4 out_Albedo;
 
         void main() {
-            out_Position = vtx.position;
-            out_Normal = normalize(vtx.normal);
-            out_Albedo.rgb = (texture(in_Sampler, vtx.texture)).rgb; // * vtx.color * in_Color2).rgb;
+            out_Position = geo.position;
+            out_Normal = normalize(geo.normal);
+            out_Albedo.rgb = texture(in_Sampler, geo.texture).rgb * geo.color.rgb;
             out_Albedo.w = 1;
         }
 );
@@ -266,6 +270,13 @@ void framebuffer_callback(GLFWwindow* window, int width, int height) {
 }
 
 int main(int argc, char* argv[]) {
+    int tgaWidth, tgaHeight, tgaFormat;
+    void* tgaPixels;
+
+    FILE* stream = fopen("./images/lion.tga", "rb");
+    readTga(stream, tgaWidth, tgaHeight, tgaFormat, tgaPixels);
+    fclose(stream);
+
     if (!glfwInit())
         return -1;
 
@@ -301,54 +312,53 @@ int main(int argc, char* argv[]) {
     Font fontRegular = textManager.loadFont("./fonts/OpenSans-Regular.ttf", 48);
     Font fontItalic = textManager.loadFont("./fonts/OpenSans-Italic.ttf", 48);
 
-    Program program = device.createProgram(vertexSource, fragmentSource, nullptr);
+    Program program = device.createProgram(vertexSource, fragmentSource, geometrySource);
 
-    struct {
+    struct In_vertexData {
         float in_Rotation[12];
+        float in_Color0[4];
+        float in_Color1[4];
         float in_Color2[4];
-        float in_Scale0[4];
-        float in_Scale1[4];
-        float in_Scale2[4];
-        float in_Scale3[4];
-    } in_vertexData = {
+        float in_Color3[4];
+        float in_Offset_Scale0[4];
+        float in_Offset_Scale1[4];
+        float in_Offset_Scale2[4];
+        float in_Offset_Scale3[4];
+    };
+
+    In_vertexData in_vertexData0 = {
+              1, 0, 0, 0,
+              0, 1, 0, 0,
+              0, 0, 1, 0,
+              1, 1, 1, 1, //color
+              1, 0, 0, 1,
+              0, 1, 0, 1,
+              0, 0, 1, 1,
+              -.5, -.5, 0, 0.35, //offset/scale
+              -.5, +.5, 0, 0.35,
+              +.5, +.5, 0, 0.35,
+              +.5, -.5, 0, 0.35,
+    };
+
+    In_vertexData in_vertexData1 = {
             1, 0, 0, 0,
             0, 1, 0, 0,
             0, 0, 1, 0,
-            1, 1, 1, 1,
-            1.00, 0, 0, 0,
-            0.75, 0, 0, 0,
-            0.50, 0, 0, 0,
-            0.25, 0, 0, 0,
+            1, 1, 1, 1, //color
+            1, 0, 0, 1,
+            0, 1, 0, 1,
+            0, 0, 1, 1,
+            0, 0, 0, 0.35, //offset/scale
+            0, 0, 0, 0.35,
+            0, 0, 0, 0.35,
+            0, 0, 0, 0.35,
     };
 
-    int bindingPoint = 0;
-    device.setConstantBufferBinding(program, "in_ShaderData", bindingPoint);
-    ConstantBuffer constantBuffer = device.createConstantBuffer(sizeof(in_vertexData), &in_vertexData, bindingPoint);
-
-    const uint32_t black = 0xff101010;
-    const uint32_t white = 0xffffffff;
-
-    const uint32_t pixels0[] = {
-            black, white, black, white,
-            white, black, white, black,
-            black, white, black, white,
-            white, black, white, black,
-    };
-    Texture2D texture0 = device.createTexture(4, 4, pixels0);
+    Texture2D texture0 = device.createRgbTexture(tgaWidth, tgaHeight, tgaPixels);
     Sampler sampler0 = device.createSampler(GL_NEAREST);
     Material* material0 = Material::create(heapAllocator, program, texture0, sampler0, device.getUniformLocation(program, "in_Sampler"));
 
-    const uint32_t pixels1[] = {
-            black, white, black, white, black, white, black, white,
-            white, black, white, black, white, black, white, black,
-            black, white, black, white, black, white, black, white,
-            white, black, white, black, white, black, white, black,
-            black, white, black, white, black, white, black, white,
-            white, black, white, black, white, black, white, black,
-            black, white, black, white, black, white, black, white,
-            white, black, white, black, white, black, white, black,
-    };
-    Texture2D texture1 = device.createTexture(8, 8, pixels1);
+    Texture2D texture1 = device.createRgbTexture(tgaWidth, tgaHeight, tgaPixels);
     Sampler sampler1 = device.createSampler(GL_LINEAR);
     Material* material1 = Material::create(heapAllocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
 
@@ -392,7 +402,7 @@ int main(int argc, char* argv[]) {
     std::vector<Vector3> colorData;
     std::vector<uint16_t> indexData;
 
-    createSphere(0.5, 20, vertexData, normalData, textureData, colorData, indexData);
+    createSphere(1.0, 20, vertexData, normalData, textureData, colorData, indexData);
     int indexSize = indexData.size();
 
     VertexBuffer vertexBuffer = device.createStaticVertexBuffer(vertexData.size()*sizeof(Vector3), vertexData.data());
@@ -425,15 +435,18 @@ int main(int argc, char* argv[]) {
 
     VertexArray vertexArray = device.createVertexArray(vertexDeclaration, 3, indexBuffer);
 
+    device.setConstantBufferBindingPoint(program, "in_ShaderData", 0);
+    ConstantBuffer constantBuffer0 = device.createConstantBuffer(sizeof(In_vertexData));
+    ConstantBuffer constantBuffer1 = device.createConstantBuffer(sizeof(In_vertexData));
+
     Model* model0 = Model::create(heapAllocator, vertexArray, 1);
-    Mesh::create(heapAllocator, &model0->meshes[0], 0, indexSize);
-    ModelInstance* modelInstance0 = ModelInstance::create(heapAllocator, model0);
+    Model::addMesh(heapAllocator, model0, 0, 0, indexSize);
+
+    ModelInstance* modelInstance0 = ModelInstance::createInstanced(heapAllocator, model0, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
     modelInstance0->materials[0] = material0;
 
-//    Model* model1 = Model::create(heapAllocator, vertexArray, 1);
-//    Mesh::create(heapAllocator, &model1->meshes[0], 3, 3);
-//    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model1);
-//    modelInstance1->materials[0] = material1;
+    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model0, constantBuffer1, &in_vertexData1, sizeof(In_vertexData));
+    modelInstance1->materials[0] = material1;
 
     viewport.x = 0;
     viewport.y = 0;
@@ -447,7 +460,7 @@ int main(int argc, char* argv[]) {
     Framebuffer gBuffer = device.createFramebuffer();
     Texture2D position = device.createFloat32Texture(wgbuffer, hgbuffer, nullptr);
     Texture2D normal = device.createFloat32Texture(wgbuffer, hgbuffer, nullptr);
-    Texture2D albedo = device.createTexture(wgbuffer, hgbuffer, nullptr);
+    Texture2D albedo = device.createRgbaTexture(wgbuffer, hgbuffer, nullptr);
     Renderbuffer depth = device.createRenderbuffer(wgbuffer, hgbuffer);
 
     device.bindTextureToFramebuffer(gBuffer, position, 0);
@@ -496,8 +509,7 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 5);
-    CopyConstantBuffer::create(setGBuffer, constantBuffer, &in_vertexData, sizeof(in_vertexData));
+    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 4);
     BindFramebuffer::create(setGBuffer, gBuffer);
     SetViewport::create(setGBuffer, &gBufferViewport);
     ClearColor::create(setGBuffer, 0.25, 0.25, 0.25, 1);
@@ -514,8 +526,8 @@ int main(int argc, char* argv[]) {
     BindVertexArray::create(drawQuad, quadVertexArray);
     DrawTriangles::create(drawQuad, 0, 6);
 
-    modelInstance0->draw(2, renderQueue, setGBuffer);
-    //modelInstance1->draw(1, renderQueue, setGBuffer);
+    ModelInstance::draw(modelInstance0, 2, renderQueue, setGBuffer);
+    ModelInstance::draw(modelInstance1, 1, renderQueue, setGBuffer);
 
     renderQueue.submit(3, &drawQuad, 1);
 
@@ -532,16 +544,16 @@ int main(int argc, char* argv[]) {
         angle += 0.005;
 
         //rotate x-axis
-        in_vertexData.in_Rotation[5] = cos;
-        in_vertexData.in_Rotation[6] = -sin;
-        in_vertexData.in_Rotation[9] = sin;
-        in_vertexData.in_Rotation[10] = cos;
+        in_vertexData0.in_Rotation[5] = cos;
+        in_vertexData0.in_Rotation[6] = -sin;
+        in_vertexData0.in_Rotation[9] = sin;
+        in_vertexData0.in_Rotation[10] = cos;
 
         //rotate z-axis
-//        in_vertexData.in_Rotation[0] = cos;
-//        in_vertexData.in_Rotation[1] = -sin;
-//        in_vertexData.in_Rotation[4] = sin;
-//        in_vertexData.in_Rotation[5] = cos;
+        in_vertexData1.in_Rotation[0] = cos;
+        in_vertexData1.in_Rotation[1] = -sin;
+        in_vertexData1.in_Rotation[4] = sin;
+        in_vertexData1.in_Rotation[5] = cos;
 
         //rotate y-axis
 //        in_vertexData.in_Rotation[0] = cos;
@@ -549,9 +561,9 @@ int main(int argc, char* argv[]) {
 //        in_vertexData.in_Rotation[8] = -sin;
 //        in_vertexData.in_Rotation[10] = cos;
 
-        in_vertexData.in_Color2[0] -= 0.00001;
-        in_vertexData.in_Color2[1] -= 0.00002;
-        in_vertexData.in_Color2[2] -= 0.00003;
+        in_vertexData0.in_Color2[0] -= 0.00001;
+        in_vertexData0.in_Color2[1] -= 0.00002;
+        in_vertexData0.in_Color2[2] -= 0.00003;
 
         CommandBuffer::execute(commandBuffer, device);
 
@@ -569,9 +581,8 @@ int main(int argc, char* argv[]) {
     }
 
     Model::destroy(heapAllocator, model0);
-    //Model::destroy(heapAllocator, model1);
     ModelInstance::destroy(heapAllocator, modelInstance0);
-    //ModelInstance::destroy(heapAllocator, modelInstance1);
+    ModelInstance::destroy(heapAllocator, modelInstance1);
     Material::destroy(heapAllocator, material0);
     Material::destroy(heapAllocator, material1);
     CommandBuffer::destroy(heapAllocator, setGBuffer);
@@ -592,7 +603,8 @@ int main(int argc, char* argv[]) {
     device.destroyVertexBuffer(textureBuffer);
     device.destroyVertexBuffer(colorBuffer);
     device.destroyIndexBuffer(indexBuffer);
-    device.destroyConstantBuffer(constantBuffer);
+    device.destroyConstantBuffer(constantBuffer0);
+    device.destroyConstantBuffer(constantBuffer1);
     device.destroyVertexArray(vertexArray);
     device.destroyVertexBuffer(quadVertexBuffer);
     device.destroyVertexBuffer(quadTextureBuffer);

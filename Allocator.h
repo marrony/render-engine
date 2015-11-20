@@ -99,12 +99,15 @@ public:
     }
 
     void deallocate(void* ptr) {
-        FreeList* newFreeList = (FreeList*) ptr - 1;
-        newFreeList->next = freeList;
-        freeList = newFreeList;
+        FreeList* node = (FreeList*) ptr - 1;
+
+        assert(alreadyDeallocated(node) == false);
+
+        node->next = freeList;
+        freeList = node;
 
         numberAllocations--;
-        bytesAllocated -= newFreeList->size;
+        bytesAllocated -= node->size;
     }
 
     size_t memoryUsed() {
@@ -122,6 +125,12 @@ public:
         }
     }
 private:
+    struct FreeList {
+        size_t size;
+        FreeList* next;
+        char data[];
+    };
+
     size_t roundSize(size_t size) {
         const size_t blockSize = 128;
         size_t blocks = size / blockSize;
@@ -132,11 +141,18 @@ private:
         return blocks * blockSize;
     }
 
-    struct FreeList {
-        size_t size;
-        FreeList* next;
-        char data[];
-    };
+    bool alreadyDeallocated(FreeList* node) {
+        FreeList* f = freeList;
+
+        while(f != nullptr) {
+            if(f == node)
+                return true;
+
+            f = f->next;
+        }
+
+        return false;
+    }
 
     FreeList* freeList;
     size_t numberAllocations;
