@@ -14,7 +14,10 @@ enum CommandType {
     BIND_FRAMEBUFFER,
     SET_VIEWPORT,
     SET_DEPTH_TEST,
-    CLEAR_COLOR,
+    CLEAR_COLOR0,
+    CLEAR_COLOR1,
+    CLEAR_COLOR2,
+    CLEAR_DEPTH_STENCIL,
     COPY_CONSTANT_BUFFER,
     BIND_CONSTANT_BUFFER,
     BIND_VERTEX_ARRAY,
@@ -113,21 +116,40 @@ struct BindFramebuffer {
 
 struct ClearColor {
     Command command;
-    float r, g, b, a;
+    float color[4];
 
-    static const uint32_t TYPE = CLEAR_COLOR;
+    static const uint32_t TYPE = CLEAR_COLOR0;
 
-    static void create(CommandBuffer* commandBuffer, float r, float g, float b, float a) {
+    static void create(CommandBuffer* commandBuffer, int index, float r, float g, float b, float a) {
         ClearColor* clearColor = getCommand<ClearColor>(commandBuffer);
-        clearColor->r = r;
-        clearColor->g = g;
-        clearColor->b = b;
-        clearColor->a = a;
+        clearColor->command.id += index;
+        clearColor->color[0] = r;
+        clearColor->color[1] = g;
+        clearColor->color[2] = b;
+        clearColor->color[3] = a;
     }
 
     static void submit(Device& device, ClearColor* cmd) {
-        glClearColor(cmd->r, cmd->g, cmd->b, cmd->a);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        int index = cmd->command.id - CLEAR_COLOR0;
+        glClearBufferfv(GL_COLOR, index, cmd->color); CHECK_ERROR;
+    }
+};
+
+struct ClearDepthStencil {
+    Command command;
+    float depth;
+    int stencil;
+
+    static const uint32_t TYPE = CLEAR_DEPTH_STENCIL;
+
+    static void create(CommandBuffer* commandBuffer, float depth, int stencil) {
+        ClearDepthStencil* clearDepthStencil = getCommand<ClearDepthStencil>(commandBuffer);
+        clearDepthStencil->depth = depth;
+        clearDepthStencil->stencil = stencil;
+    }
+
+    static void submit(Device& device, ClearDepthStencil* cmd) {
+        glClearBufferfi(GL_DEPTH_STENCIL, 0, cmd->depth, cmd->stencil); CHECK_ERROR;
     }
 };
 
@@ -329,7 +351,10 @@ struct DrawTrianglesInstanced {
 const FnSubmitCommand submitCommand[] = {
         [DRAW_TRIANGLES] = FnSubmitCommand(DrawTriangles::submit),
         [DRAW_TRIANGLES_INSTANCED] = FnSubmitCommand(DrawTrianglesInstanced::submit),
-        [CLEAR_COLOR] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR0] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR1] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR2] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_DEPTH_STENCIL] = FnSubmitCommand(ClearDepthStencil::submit),
         [BIND_FRAMEBUFFER] = FnSubmitCommand(BindFramebuffer::submit),
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
         [SET_DEPTH_TEST] = FnSubmitCommand(SetDepthTest::submit),
@@ -346,7 +371,10 @@ const FnSubmitCommand submitCommand[] = {
 const int sizeCommand[] = {
         [DRAW_TRIANGLES] = sizeof(DrawTriangles),
         [DRAW_TRIANGLES_INSTANCED] = sizeof(DrawTrianglesInstanced),
-        [CLEAR_COLOR] = sizeof(ClearColor),
+        [CLEAR_COLOR0] = sizeof(ClearColor),
+        [CLEAR_COLOR1] = sizeof(ClearColor),
+        [CLEAR_COLOR2] = sizeof(ClearColor),
+        [CLEAR_DEPTH_STENCIL] = sizeof(ClearDepthStencil),
         [BIND_FRAMEBUFFER] = sizeof(BindFramebuffer),
         [SET_VIEWPORT] = sizeof(SetViewport),
         [SET_DEPTH_TEST] = sizeof(SetDepthTest),

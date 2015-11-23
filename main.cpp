@@ -439,14 +439,14 @@ int main(int argc, char* argv[]) {
     ConstantBuffer constantBuffer0 = device.createConstantBuffer(sizeof(In_vertexData));
     ConstantBuffer constantBuffer1 = device.createConstantBuffer(sizeof(In_vertexData));
 
-    Model* model0 = Model::create(heapAllocator, vertexArray, 1);
-    Model::addMesh(heapAllocator, model0, 0, 0, indexSize);
+    Model* model = Model::create(heapAllocator, vertexArray, 1);
+    Model::addMesh(heapAllocator, model, 0, 0, indexSize);
 
-    ModelInstance* modelInstance0 = ModelInstance::createInstanced(heapAllocator, model0, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
-    modelInstance0->materials[0] = material0;
+    ModelInstance* modelInstance0 = ModelInstance::createInstanced(heapAllocator, model, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
+    modelInstance0->perMesh[0].material = material0;
 
-    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model0, constantBuffer1, &in_vertexData1, sizeof(In_vertexData));
-    modelInstance1->materials[0] = material1;
+    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model, constantBuffer1, &in_vertexData1, sizeof(In_vertexData));
+    modelInstance1->perMesh[0].material = material1;
 
     viewport.x = 0;
     viewport.y = 0;
@@ -509,10 +509,11 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 4);
+    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 5);
     BindFramebuffer::create(setGBuffer, gBuffer);
     SetViewport::create(setGBuffer, &gBufferViewport);
     ClearColor::create(setGBuffer, 0.25, 0.25, 0.25, 1);
+    ClearDepth::create(setGBuffer, 1.0);
     SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
 
     CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 9);
@@ -580,7 +581,7 @@ int main(int argc, char* argv[]) {
         glfwPollEvents();
     }
 
-    Model::destroy(heapAllocator, model0);
+    Model::destroy(heapAllocator, model);
     ModelInstance::destroy(heapAllocator, modelInstance0);
     ModelInstance::destroy(heapAllocator, modelInstance1);
     Material::destroy(heapAllocator, material0);

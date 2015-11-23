@@ -38,7 +38,7 @@ struct Mesh {
     }
 
     static void destroy(HeapAllocator& allocator, Mesh* mesh) {
-        allocator.deallocate(mesh->draw);
+        CommandBuffer::destroy(allocator, mesh->draw);
     }
 };
 
@@ -70,22 +70,27 @@ struct Model {
 };
 
 struct ModelInstance {
-    CommandBuffer* state;
+    struct PerMesh {
+        CommandBuffer* draw;
+        Material* material;
+    };
+
     int instanceCount;
-    CommandBuffer** drawInstanced;
+    CommandBuffer* state;
     Model* model;
-    Material* materials[];
+    PerMesh perMesh[];
 
     static void draw(ModelInstance* modelInstance, uint64_t key, RenderQueue& renderQueue, CommandBuffer* globalState) {
-        for (int i = 0; i < modelInstance->model->meshCount; i++) {
-            Mesh* mesh = &modelInstance->model->meshes[i];
-            Material* material = modelInstance->materials[i];
-            CommandBuffer* draw = modelInstance->instanceCount > 0 ? modelInstance->drawInstanced[i] : mesh->draw;
+        Model* model = modelInstance->model;
+
+        for (int i = 0; i < model->meshCount; i++) {
+            Material* material = modelInstance->perMesh[i].material;
+            CommandBuffer* draw = modelInstance->perMesh[i].draw;
 
             CommandBuffer* commandBuffers[] = {
                     globalState,
                     modelInstance->state,
-                    modelInstance->model->state,
+                    model->state,
                     material->state,
                     draw,
             };
@@ -95,22 +100,11 @@ struct ModelInstance {
     }
 
     static ModelInstance* create(HeapAllocator& allocator, Model* model, ConstantBuffer constantBuffer, const void* data, size_t size) {
-        size_t nbytes = sizeof(ModelInstance) + model->meshCount * sizeof(Material*);
-
-        ModelInstance* modelInstance = (ModelInstance*) allocator.allocate(nbytes);
-
-        modelInstance->state = CommandBuffer::create(allocator, 2);
-        CopyConstantBuffer::create(modelInstance->state, constantBuffer, data, size);
-        BindConstantBuffer::create(modelInstance->state, constantBuffer, 0);
-        modelInstance->model = model;
-        modelInstance->instanceCount = 0;
-        modelInstance->drawInstanced = nullptr;
-
-        return modelInstance;
+        return createInstanced(allocator, model, 1, constantBuffer, data, size);
     }
 
     static ModelInstance* createInstanced(HeapAllocator& allocator, Model* model, int instanceCount, ConstantBuffer constantBuffer, const void* data, size_t size) {
-        size_t nbytes = sizeof(ModelInstance) + model->meshCount * sizeof(Material*);
+        size_t nbytes = sizeof(ModelInstance) + model->meshCount * sizeof(PerMesh);
 
         ModelInstance* modelInstance = (ModelInstance*) allocator.allocate(nbytes);
 
@@ -119,16 +113,17 @@ struct ModelInstance {
         BindConstantBuffer::create(modelInstance->state, constantBuffer, 0);
         modelInstance->model = model;
         modelInstance->instanceCount = instanceCount;
-        modelInstance->drawInstanced = nullptr;
 
-        if(instanceCount > 1) {
-            modelInstance->drawInstanced = (CommandBuffer**) allocator.allocate(model->meshCount * sizeof(CommandBuffer*));
+        for (int i = 0; i < model->meshCount; i++) {
+            modelInstance->perMesh[i].material = nullptr;
 
-            for (int i = 0; i < model->meshCount; i++) {
-                Mesh* mesh = &model->meshes[i];
+            Mesh* mesh = &model->meshes[i];
 
-                modelInstance->drawInstanced[i] = CommandBuffer::create(allocator, 1);
-                DrawTrianglesInstanced::create(modelInstance->drawInstanced[i], mesh->offset, mesh->count, instanceCount);
+            if(instanceCount > 1) {
+                modelInstance->perMesh[i].draw = CommandBuffer::create(allocator, 1);
+                DrawTrianglesInstanced::create(modelInstance->perMesh[i].draw, mesh->offset, mesh->count, instanceCount);
+            } else {
+                modelInstance->perMesh[i].draw = mesh->draw;
             }
         }
 
@@ -137,10 +132,9 @@ struct ModelInstance {
 
     static void destroy(HeapAllocator& allocator, ModelInstance* modelInstance) {
         allocator.deallocate(modelInstance->state);
-        if(modelInstance->drawInstanced != nullptr) {
+        if(modelInstance->instanceCount > 1) {
             for(int i = 0; i < modelInstance->model->meshCount; i++)
-                CommandBuffer::destroy(allocator, modelInstance->drawInstanced[i]);
-            allocator.deallocate(modelInstance->drawInstanced);
+                CommandBuffer::destroy(allocator, modelInstance->perMesh[i].draw);
         }
         allocator.deallocate(modelInstance);
     }
