@@ -58,7 +58,7 @@ void check_error(const char* file, int line) {
 #include "Text.h"
 #include "Model.h"
 #include "Shapes.h"
-#include "TgaReader.h"
+#include "Texture.h"
 
 const char* vertexSource = STR(
         layout(location = 0) in vec3 in_Position;
@@ -228,9 +228,9 @@ const char* quadFragmentSource = STR(
         }
 
         void main() {
-            vec3 lightPos0 = vec3(0, 1.2, -1);
-            vec3 lightPos1 = vec3(+1.2, 0, -1);
-            vec3 lightPos2 = vec3(-1.2, 0, -1);
+            vec3 lightPos0 = vec3(0, 2, -1);
+            vec3 lightPos1 = vec3(+2, 0, -1);
+            vec3 lightPos2 = vec3(-2, 0, -1);
 
             vec3 position = texture(in_Position, geo_Texture).rgb;
             vec3 normal = texture(in_Normal, geo_Texture).rgb;
@@ -270,13 +270,6 @@ void framebuffer_callback(GLFWwindow* window, int width, int height) {
 }
 
 int main(int argc, char* argv[]) {
-    int tgaWidth, tgaHeight, tgaFormat;
-    void* tgaPixels;
-
-    FILE* stream = fopen("./images/lion.tga", "rb");
-    readTga(stream, tgaWidth, tgaHeight, tgaFormat, tgaPixels);
-    fclose(stream);
-
     if (!glfwInit())
         return -1;
 
@@ -307,6 +300,7 @@ int main(int argc, char* argv[]) {
 
     Device device;
 
+    TextureManager textureManager(heapAllocator, device);
     TextManager textManager(heapAllocator, device);
 
     Font fontRegular = textManager.loadFont("./fonts/OpenSans-Regular.ttf", 48);
@@ -331,9 +325,9 @@ int main(int argc, char* argv[]) {
               0, 1, 0, 0,
               0, 0, 1, 0,
               1, 1, 1, 1, //color
-              1, 0, 0, 1,
-              0, 1, 0, 1,
-              0, 0, 1, 1,
+              1, 1, 1, 1,
+              1, 1, 1, 1,
+              1, 1, 1, 1,
               -.5, -.5, 0, 0.35, //offset/scale
               -.5, +.5, 0, 0.35,
               +.5, +.5, 0, 0.35,
@@ -345,21 +339,21 @@ int main(int argc, char* argv[]) {
             0, 1, 0, 0,
             0, 0, 1, 0,
             1, 1, 1, 1, //color
-            1, 0, 0, 1,
-            0, 1, 0, 1,
-            0, 0, 1, 1,
+            1, 1, 1, 1,
+            1, 1, 1, 1,
+            1, 1, 1, 1,
             0, 0, 0, 0.35, //offset/scale
             0, 0, 0, 0.35,
             0, 0, 0, 0.35,
             0, 0, 0, 0.35,
     };
 
-    Texture2D texture0 = device.createRgbTexture(tgaWidth, tgaHeight, tgaPixels);
-    Sampler sampler0 = device.createSampler(GL_NEAREST);
+    Texture2D texture0 = textureManager.loadTexture("images/lion.tga");
+    Sampler sampler0 = textureManager.getNearest();
     Material* material0 = Material::create(heapAllocator, program, texture0, sampler0, device.getUniformLocation(program, "in_Sampler"));
 
-    Texture2D texture1 = device.createRgbTexture(tgaWidth, tgaHeight, tgaPixels);
-    Sampler sampler1 = device.createSampler(GL_LINEAR);
+    Texture2D texture1 = textureManager.loadTexture("images/lion.tga");
+    Sampler sampler1 = textureManager.getLinear();
     Material* material1 = Material::create(heapAllocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
 
 #if 0
@@ -509,11 +503,13 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 5);
+    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 7);
     BindFramebuffer::create(setGBuffer, gBuffer);
     SetViewport::create(setGBuffer, &gBufferViewport);
-    ClearColor::create(setGBuffer, 0.25, 0.25, 0.25, 1);
-    ClearDepth::create(setGBuffer, 1.0);
+    ClearColor::create(setGBuffer, 0, 0.25, 0.25, 0.25, 1);
+    ClearColor::create(setGBuffer, 1, 0.25, 0.25, 0.25, 1);
+    ClearColor::create(setGBuffer, 2, 0.25, 0.25, 0.25, 1);
+    ClearDepthStencil::create(setGBuffer, 1.0, 0x00);
     SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
 
     CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 9);
@@ -590,13 +586,11 @@ int main(int argc, char* argv[]) {
     CommandBuffer::destroy(heapAllocator, drawQuad);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
 
-    device.destroyTexture(texture0);
-    device.destroyTexture(texture1);
+    textureManager.unloadTexture(texture0);
+    textureManager.unloadTexture(texture1);
     device.destroyTexture(position);
     device.destroyTexture(normal);
     device.destroyTexture(albedo);
-    device.destroySampler(sampler0);
-    device.destroySampler(sampler1);
     device.destoryRenderbuffer(depth);
     device.destroyFramebuffer(gBuffer);
     device.destroyVertexBuffer(vertexBuffer);

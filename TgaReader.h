@@ -43,7 +43,7 @@ struct TGAHeader {
     uint8_t image_descriptor;
 };
 
-bool readTga(FILE* stream, int& width, int& height, int& format, void*& pixels) {
+bool readTga(FILE* stream, int& width, int& height, int& format, char*& pixels) {
     TGAHeader header;
 
     fread(&header.id, sizeof(header.id), 1, stream);
