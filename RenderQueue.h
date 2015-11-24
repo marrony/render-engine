@@ -43,7 +43,7 @@ public:
         itemsCount++;
     }
 
-    CommandBuffer* sendToCommandBuffer(HeapAllocator& allocator) {
+    CommandBuffer* sendToCommandBuffer() {
         CommandBuffer* commandBuffer = CommandBuffer::create(allocator, 10);
 
         std::function<void(Command*)> exec = [&](Command* src) {

@@ -430,60 +430,80 @@ public:
     //////////////////////////////////////////////////
 
     void destroyTexture(Texture2D texture) {
+        if (texture.id == 0) return;
+
         glDeleteTextures(1, &texture.id);
 
         textureCount--;
     }
 
     void destroyTexture(DepthStencilTexture texture) {
+        if (texture.id == 0) return;
+
         glDeleteTextures(1, &texture.id);
 
         textureCount--;
     }
 
     void destroySampler(Sampler sampler) {
+        if (sampler.id == 0) return;
+
         glDeleteSamplers(1, &sampler.id);
 
         samplerCount--;
     }
 
     void destroyVertexBuffer(VertexBuffer vertexBuffer) {
+        if (vertexBuffer.id == 0) return;
+
         glDeleteBuffers(1, &vertexBuffer.id);
 
         vertexBufferCount--;
     }
 
     void destroyIndexBuffer(IndexBuffer indexBuffer) {
+        if (indexBuffer.id == 0) return;
+
         glDeleteBuffers(1, &indexBuffer.id);
 
         indexBufferCount--;
     }
 
     void destroyConstantBuffer(ConstantBuffer constantBuffer) {
+        if (constantBuffer.id == 0) return;
+
         glDeleteBuffers(1, &constantBuffer.id);
 
         constantBufferCount--;
     }
 
     void destroyVertexArray(VertexArray vertexArray) {
+        if (vertexArray.id == 0) return;
+
         glDeleteVertexArrays(1, &vertexArray.id);
 
         vertexArrayCount--;
     }
 
     void destroyProgram(Program program) {
+        if (program.id == 0) return;
+
         glDeleteProgram(program.id);
 
         programCount--;
     }
 
     void destoryRenderbuffer(Renderbuffer renderbuffer) {
+        if (renderbuffer.id == 0) return;
+
         glDeleteRenderbuffers(1, &renderbuffer.id);
 
         renderbufferCount--;
     }
 
     void destroyFramebuffer(Framebuffer framebuffer) {
+        if (framebuffer.id == 0) return;
+
         glDeleteFramebuffers(1, &framebuffer.id);
 
         framebufferCount--;

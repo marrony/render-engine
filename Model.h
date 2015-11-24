@@ -67,6 +67,18 @@ struct Model {
             Mesh::destroy(allocator, &model->meshes[i]);
         allocator.deallocate(model);
     }
+
+    static void draw(Model* model, uint64_t key, RenderQueue& renderQueue, CommandBuffer* globalState) {
+        for (int i = 0; i < model->meshCount; i++) {
+            CommandBuffer* commandBuffers[] = {
+                    globalState,
+                    model->state,
+                    model->meshes[i].draw
+            };
+
+            renderQueue.submit(key, commandBuffers, 3);
+        }
+    }
 };
 
 struct ModelInstance {
@@ -137,6 +149,10 @@ struct ModelInstance {
                 CommandBuffer::destroy(allocator, modelInstance->perMesh[i].draw);
         }
         allocator.deallocate(modelInstance);
+    }
+
+    static void setMaterial(ModelInstance* modelInstance, int index, Material* material) {
+        modelInstance->perMesh[index].material = material;
     }
 };
 

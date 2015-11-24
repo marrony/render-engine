@@ -20,6 +20,8 @@ public:
     }
 
     ~TextureManager() {
+        assert(textureCount == 0);
+
         allocator.deallocate(textures);
 
         device.destroySampler(linear);
@@ -60,13 +62,14 @@ public:
     void unloadTexture(Texture2D texture) {
         uint32_t index;
 
-        if(findTexture(texture, index)) {
+        if (findTexture(texture, index)) {
             textures[index].refs--;
 
-            if(textures[index].refs == 0) {
+            if (textures[index].refs == 0) {
+                destroy(&textures[index]);
+
                 textureCount--;
                 std::swap(textures[index], textures[textureCount]);
-                device.destroyTexture(texture);
             }
         }
     }
@@ -84,6 +87,10 @@ private:
         Texture2D texture;
         uint32_t refs;
     };
+
+    void destroy(Resource* resource) {
+        device.destroyTexture(resource->texture);
+    }
 
     bool findTexture(Texture2D texture, uint32_t& index) {
         for(uint32_t i = 0; i < textureCount; i++) {

@@ -215,6 +215,10 @@ const char* quadGeometrySource = STR(
 const char* quadFragmentSource = STR(
         in vec2 geo_Texture;
 
+        layout(std140) uniform in_LightData {
+            vec3 in_LightPos[3];
+        };
+
         uniform sampler2D in_Position;
         uniform sampler2D in_Normal;
         uniform sampler2D in_Albedo;
@@ -228,18 +232,14 @@ const char* quadFragmentSource = STR(
         }
 
         void main() {
-            vec3 lightPos0 = vec3(0, 2, -1);
-            vec3 lightPos1 = vec3(+2, 0, -1);
-            vec3 lightPos2 = vec3(-2, 0, -1);
-
             vec3 position = texture(in_Position, geo_Texture).rgb;
             vec3 normal = texture(in_Normal, geo_Texture).rgb;
             vec4 albedo = texture(in_Albedo, geo_Texture);
 
             vec3 lighting = albedo.rgb * 0.2;
-            lighting += calculateLight(position, normal, albedo, lightPos0, vec3(1, 0, 0));
-            lighting += calculateLight(position, normal, albedo, lightPos1, vec3(0, 1, 0));
-            lighting += calculateLight(position, normal, albedo, lightPos2, vec3(0, 0, 1));
+            lighting += calculateLight(position, normal, albedo, in_LightPos[0], vec3(1, 0, 0));
+            lighting += calculateLight(position, normal, albedo, in_LightPos[1], vec3(0, 1, 0));
+            lighting += calculateLight(position, normal, albedo, in_LightPos[2], vec3(0, 0, 1));
 
             out_FragColor.rgb = lighting;
             out_FragColor.a = 1;
@@ -361,20 +361,20 @@ int main(int argc, char* argv[]) {
     ConstantBuffer constantBuffer0 = device.createConstantBuffer(sizeof(In_vertexData));
     ConstantBuffer constantBuffer1 = device.createConstantBuffer(sizeof(In_vertexData));
 
-    Model* model = modelManager.createSphere(1.0, 20);
+    Model* model = modelManager.createSphere("sphere01", 1.0, 20);
 
-    ModelInstance* modelInstance0 = ModelInstance::createInstanced(heapAllocator, model, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
-    modelInstance0->perMesh[0].material = material0;
+    ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
+    ModelInstance::setMaterial(modelInstance0, 0, material0);
 
-    ModelInstance* modelInstance1 = ModelInstance::create(heapAllocator, model, constantBuffer1, &in_vertexData1, sizeof(In_vertexData));
-    modelInstance1->perMesh[0].material = material1;
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 1, constantBuffer1, &in_vertexData1, sizeof(In_vertexData));
+    ModelInstance::setMaterial(modelInstance1, 0, material1);
+
+    modelManager.destroyModel(model);
 
     viewport.x = 0;
     viewport.y = 0;
     glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
     glViewport(0, 0, viewport.width, viewport.height);
-
-    RenderQueue renderQueue(device, heapAllocator);
 
     int wgbuffer = 512;
     int hgbuffer = 512;
@@ -395,38 +395,6 @@ int main(int argc, char* argv[]) {
     int targets[] = { 0, 1, 2 };
     device.setRenderTarget(gBuffer, targets, 3);
 
-    Framebuffer nullFramebuffer = {0};
-
-    float quadVertex[] = {
-            -1.0, -1.0, 0.0,
-            -1.0, +1.0, 0.0,
-            +1.0, +1.0, 0.0,
-            +1.0, -1.0, 0.0,
-    };
-    float quadTexture[] = {
-            0, 0,
-            0, 1,
-            1, 1,
-            1, 0
-    };
-    uint16_t quadIndex[] = {0, 1, 3, 3, 1, 2};
-
-    VertexBuffer quadVertexBuffer = device.createStaticVertexBuffer(sizeof(quadVertex), quadVertex);
-    VertexBuffer quadTextureBuffer = device.createStaticVertexBuffer(sizeof(quadTexture), quadTexture);
-    IndexBuffer quadIndexBuffer = device.createIndexBuffer(sizeof(quadIndex), quadIndex);
-
-    VertexDeclaration vertexDeclarationQuad[2] = {};
-    vertexDeclarationQuad[0].buffer = quadVertexBuffer;
-    vertexDeclarationQuad[0].format = VertexFloat3;
-    vertexDeclarationQuad[0].offset = 0;
-    vertexDeclarationQuad[0].stride = 0;
-
-    vertexDeclarationQuad[1].buffer = quadTextureBuffer;
-    vertexDeclarationQuad[1].format = VertexFloat2;
-    vertexDeclarationQuad[1].offset = 0;
-    vertexDeclarationQuad[1].stride = 0;
-
-    VertexArray quadVertexArray = device.createVertexArray(vertexDeclarationQuad, 2, quadIndexBuffer);
     Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
@@ -439,7 +407,13 @@ int main(int argc, char* argv[]) {
     ClearDepthStencil::create(setGBuffer, 1.0, 0x00);
     SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
 
-    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 9);
+    device.setConstantBufferBindingPoint(quadProgram, "in_LightData", 0);
+
+    Vector4 lightPos[3] = {};
+    ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(sizeof(lightPos));
+
+    Framebuffer nullFramebuffer = {0};
+    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 11);
     BindFramebuffer::create(drawQuad, nullFramebuffer);
     SetViewport::create(drawQuad, &viewport);
     SetDepthTest::create(drawQuad, false, 0);
@@ -447,23 +421,55 @@ int main(int argc, char* argv[]) {
     BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
     BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
     BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
-    BindVertexArray::create(drawQuad, quadVertexArray);
-    DrawTriangles::create(drawQuad, 0, 6);
+    CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightPos, sizeof(lightPos));
+    BindConstantBuffer::create(drawQuad, lightPosConstantBuffer, 0);
+
+    RenderQueue renderQueue(device, heapAllocator);
+
+    Model* quadModel = modelManager.createQuad("quad");
 
     ModelInstance::draw(modelInstance0, 2, renderQueue, setGBuffer);
     ModelInstance::draw(modelInstance1, 1, renderQueue, setGBuffer);
+    Model::draw(quadModel, 3, renderQueue, drawQuad);
 
-    renderQueue.submit(3, &drawQuad, 1);
-
-    CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer(heapAllocator);
+    CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
 
     glEnable(GL_CULL_FACE); CHECK_ERROR;
     glCullFace(GL_FRONT); CHECK_ERROR;
 
+    double current = glfwGetTime();
+    double inc = 0;
+    int fps = 0;
+    int fps2 = 0;
+
     float angle = 0;
     while (!glfwWindowShouldClose(window)) {
+        double c = glfwGetTime();
+        double d = c - current;
+        inc += d;
+        current = c;
+        fps++;
+
+        if(inc > 1) {
+            fps2 = fps;
+            fps = 0;
+            inc = 0;
+        }
+
         float cos = cosf(angle);
         float sin = sinf(angle);
+
+        lightPos[0].x = sin * 2;
+        lightPos[0].y = 0;
+        lightPos[0].z = -1;
+
+        lightPos[1].x = 0;
+        lightPos[1].y = sin * 2;
+        lightPos[1].z = -1;
+
+        lightPos[2].x = cos * 2;
+        lightPos[2].y = sin * 2;
+        lightPos[2].z = -1;
 
         angle += 0.005;
 
@@ -491,7 +497,7 @@ int main(int argc, char* argv[]) {
 
         CommandBuffer::execute(commandBuffer, device);
 
-        textManager.printText(fontItalic, 10, 230, "Angle: %f", angle);
+        textManager.printText(fontItalic, 10, 230, "Fps: %d Angle: %f", fps2, angle);
         textManager.printText(fontRegular, 10, 180, "viewport: %d %d %d %d", viewport.x, viewport.y, viewport.width, viewport.height);
         textManager.printText(fontRegular, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
@@ -504,27 +510,26 @@ int main(int argc, char* argv[]) {
         glfwPollEvents();
     }
 
-    ModelInstance::destroy(heapAllocator, modelInstance0);
-    ModelInstance::destroy(heapAllocator, modelInstance1);
     Material::destroy(heapAllocator, material0);
     Material::destroy(heapAllocator, material1);
     CommandBuffer::destroy(heapAllocator, setGBuffer);
     CommandBuffer::destroy(heapAllocator, drawQuad);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
 
+    modelManager.destroyModel(quadModel);
+    modelManager.destroyModelInstance(modelInstance0);
+    modelManager.destroyModelInstance(modelInstance1);
     textureManager.unloadTexture(texture0);
     textureManager.unloadTexture(texture1);
+
     device.destroyTexture(position);
     device.destroyTexture(normal);
     device.destroyTexture(albedo);
     device.destoryRenderbuffer(depth);
     device.destroyFramebuffer(gBuffer);
+    device.destroyConstantBuffer(lightPosConstantBuffer);
     device.destroyConstantBuffer(constantBuffer0);
     device.destroyConstantBuffer(constantBuffer1);
-    device.destroyVertexBuffer(quadVertexBuffer);
-    device.destroyVertexBuffer(quadTextureBuffer);
-    device.destroyIndexBuffer(quadIndexBuffer);
-    device.destroyVertexArray(quadVertexArray);
     device.destroyProgram(program);
     device.destroyProgram(quadProgram);
 
