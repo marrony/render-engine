@@ -1,5 +1,5 @@
 //
-// Created by Marrony Neris on 11/17/15.
+// Created by Marrony Neris on 11/24/15.
 //
 
 #ifndef SHAPES_H
@@ -17,18 +17,16 @@ struct Vector3 {
 
 void createSphere(float size, int numberSlices,
                   std::vector<Vector3>& vertex, std::vector<Vector3>& normal,
-                  std::vector<Vector2>& texture, std::vector<Vector3>& color,
-                  std::vector<uint16_t>& indices) {
+                  std::vector<Vector2>& texture, std::vector<uint16_t>& indices) {
 
     int numberParallels = numberSlices / 2;
     int numberVertices = (numberParallels + 1) * (numberSlices + 1);
     int numberIndices = numberParallels * numberSlices * 6;
-    float angleStep = (2.0f * 3.1415926535897932384626433832795f) / (float)numberSlices;
+    float angleStep = (2.0f * 3.1415926535897932384626433832795f) / (float) numberSlices;
 
     vertex.resize(numberVertices);
     normal.resize(numberVertices);
     texture.resize(numberVertices);
-    color.resize(numberVertices);
     indices.resize(numberIndices);
 
     for (int i = 0; i < numberParallels + 1; i++) {
@@ -43,17 +41,13 @@ void createSphere(float size, int numberSlices,
             normal[index].y = vertex[index].y / size;
             normal[index].z = vertex[index].z / size;
 
-            texture[index].x = (float)j / (float)numberSlices;
-            texture[index].y = 1.0f - (float)i / (float)numberParallels;
-
-            color[index].x = 1;
-            color[index].y = 1;
-            color[index].z = 1;
+            texture[index].x = (float) j / (float) numberSlices;
+            texture[index].y = 1.0f - (float) i / (float) numberParallels;
         }
     }
 
     int index = 0;
-    for(int i = 0; i < numberParallels; i++) {
+    for (int i = 0; i < numberParallels; i++) {
         for (int j = 0; j < numberSlices; j++) {
             int i0 = i;
             int i1 = i + 1;

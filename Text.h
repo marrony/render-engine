@@ -40,7 +40,7 @@ public:
             :  allocator(allocator), device(device), fontCount(0) {
         vertexBuffer = device.createDynamicVertexBuffer(sizeof(float) * 4 * 4, nullptr);
 
-        VertexDeclarationDesc vertexDeclaration[1] = {};
+        VertexDeclaration vertexDeclaration[1] = {};
         vertexDeclaration[0].buffer = vertexBuffer;
         vertexDeclaration[0].format = VertexFloat4;
         vertexDeclaration[0].offset = 0;

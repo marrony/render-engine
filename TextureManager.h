@@ -2,21 +2,21 @@
 // Created by Marrony Neris on 11/23/15.
 //
 
-#ifndef TEXTURE_H
-#define TEXTURE_H
+#ifndef TEXTURE_MANAGER_H
+#define TEXTURE_MANAGER_H
 
 #include "TgaReader.h"
 
 class TextureManager {
 public:
     TextureManager(HeapAllocator& allocator, Device& device) : allocator(allocator), device(device) {
-        linear = device.createSampler(GL_LINEAR);
-        nearest = device.createSampler(GL_NEAREST);
+        linear = device.createSampler(GL_LINEAR, GL_LINEAR);
+        nearest = device.createSampler(GL_NEAREST, GL_NEAREST);
 
         textureCount = 0;
         textureAllocated = 16;
-        textures = (Tex*) allocator.allocate(textureAllocated * sizeof(Tex));
-        memset(textures, 0, textureAllocated * sizeof(Tex));
+        textures = (Resource*) allocator.allocate(textureAllocated * sizeof(Resource));
+        memset(textures, 0, textureAllocated * sizeof(Resource));
     }
 
     ~TextureManager() {
@@ -36,7 +36,7 @@ public:
 
         if(textureCount >= textureAllocated) {
             textureAllocated = textureAllocated * 3 / 2;
-            textures = (Tex*) allocator.reallocate(textures, textureAllocated * sizeof(Tex));
+            textures = (Resource*) allocator.reallocate(textures, textureAllocated * sizeof(Resource));
         }
 
         index = textureCount++;
@@ -79,7 +79,7 @@ public:
         return nearest;
     }
 private:
-    struct Tex {
+    struct Resource {
         const char* filename;
         Texture2D texture;
         uint32_t refs;
@@ -108,7 +108,7 @@ private:
     HeapAllocator& allocator;
     Device& device;
 
-    Tex* textures;
+    Resource* textures;
     uint32_t textureCount;
     uint32_t textureAllocated;
 
@@ -116,4 +116,4 @@ private:
     Sampler nearest;
 };
 
-#endif //TEXTURE_H
+#endif //TEXTURE_MANAGER_H

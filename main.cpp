@@ -57,8 +57,8 @@ void check_error(const char* file, int line) {
 #include "RenderQueue.h"
 #include "Text.h"
 #include "Model.h"
-#include "Shapes.h"
-#include "Texture.h"
+#include "ModelManager.h"
+#include "TextureManager.h"
 
 const char* vertexSource = STR(
         layout(location = 0) in vec3 in_Position;
@@ -300,6 +300,7 @@ int main(int argc, char* argv[]) {
 
     Device device;
 
+    ModelManager modelManager(heapAllocator, device);
     TextureManager textureManager(heapAllocator, device);
     TextManager textManager(heapAllocator, device);
 
@@ -356,85 +357,11 @@ int main(int argc, char* argv[]) {
     Sampler sampler1 = textureManager.getLinear();
     Material* material1 = Material::create(heapAllocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
 
-#if 0
-    float vertexData[] = {
-            -0.5, -0.5, 0.0,
-            -0.5, +0.5, 0.0,
-            +0.5, +0.5, 0.0,
-            +0.5, -0.5, 0.0,
-    };
-    float normalData[] = {
-            -1.0, -1.0, 0.5,
-            -1.0, +1.0, 0.5,
-            +1.0, +1.0, 0.5,
-            +1.0, -1.0, 0.5,
-    };
-    float textureData[] = {
-            0, 0,
-            0, 1,
-            1, 1,
-            1, 0
-    };
-    float colorData[] = {
-            1, 1, 1,
-            1, 1, 1,
-            1, 1, 1,
-            1, 1, 1,
-    };
-    uint16_t indexData[] = {0, 1, 3, 3, 1, 2};
-    int indexSize = 6;
-
-    VertexBuffer vertexBuffer = device.createStaticVertexBuffer(sizeof(vertexData), vertexData);
-    VertexBuffer normalBuffer = device.createStaticVertexBuffer(sizeof(normalData), normalData);
-    VertexBuffer textureBuffer = device.createStaticVertexBuffer(sizeof(textureData), textureData);
-    VertexBuffer colorBuffer = device.createStaticVertexBuffer(sizeof(colorData), colorData);
-    IndexBuffer indexBuffer = device.createIndexBuffer(sizeof(indexData), indexData);
-#else
-    std::vector<Vector3> vertexData;
-    std::vector<Vector3> normalData;
-    std::vector<Vector2> textureData;
-    std::vector<Vector3> colorData;
-    std::vector<uint16_t> indexData;
-
-    createSphere(1.0, 20, vertexData, normalData, textureData, colorData, indexData);
-    int indexSize = indexData.size();
-
-    VertexBuffer vertexBuffer = device.createStaticVertexBuffer(vertexData.size()*sizeof(Vector3), vertexData.data());
-    VertexBuffer normalBuffer = device.createStaticVertexBuffer(normalData.size()*sizeof(Vector3), normalData.data());
-    VertexBuffer textureBuffer = device.createStaticVertexBuffer(textureData.size()*sizeof(Vector2), textureData.data());
-    VertexBuffer colorBuffer = device.createStaticVertexBuffer(colorData.size()*sizeof(Vector3), colorData.data());
-    IndexBuffer indexBuffer = device.createIndexBuffer(indexData.size()*sizeof(uint16_t), indexData.data());
-#endif
-
-    VertexDeclarationDesc vertexDeclaration[4] = {};
-    vertexDeclaration[0].buffer = vertexBuffer;
-    vertexDeclaration[0].format = VertexFloat3;
-    vertexDeclaration[0].offset = 0;
-    vertexDeclaration[0].stride = 0;
-
-    vertexDeclaration[1].buffer = normalBuffer;
-    vertexDeclaration[1].format = VertexFloat3;
-    vertexDeclaration[1].offset = 0;
-    vertexDeclaration[1].stride = 0;
-
-    vertexDeclaration[2].buffer = textureBuffer;
-    vertexDeclaration[2].format = VertexFloat2;
-    vertexDeclaration[2].offset = 0;
-    vertexDeclaration[2].stride = 0;
-
-    vertexDeclaration[3].buffer = colorBuffer;
-    vertexDeclaration[3].format = VertexFloat3;
-    vertexDeclaration[3].offset = 0;
-    vertexDeclaration[3].stride = 0;
-
-    VertexArray vertexArray = device.createVertexArray(vertexDeclaration, 3, indexBuffer);
-
     device.setConstantBufferBindingPoint(program, "in_ShaderData", 0);
     ConstantBuffer constantBuffer0 = device.createConstantBuffer(sizeof(In_vertexData));
     ConstantBuffer constantBuffer1 = device.createConstantBuffer(sizeof(In_vertexData));
 
-    Model* model = Model::create(heapAllocator, vertexArray, 1);
-    Model::addMesh(heapAllocator, model, 0, 0, indexSize);
+    Model* model = modelManager.createSphere(1.0, 20);
 
     ModelInstance* modelInstance0 = ModelInstance::createInstanced(heapAllocator, model, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
     modelInstance0->perMesh[0].material = material0;
@@ -488,7 +415,7 @@ int main(int argc, char* argv[]) {
     VertexBuffer quadTextureBuffer = device.createStaticVertexBuffer(sizeof(quadTexture), quadTexture);
     IndexBuffer quadIndexBuffer = device.createIndexBuffer(sizeof(quadIndex), quadIndex);
 
-    VertexDeclarationDesc vertexDeclarationQuad[2] = {};
+    VertexDeclaration vertexDeclarationQuad[2] = {};
     vertexDeclarationQuad[0].buffer = quadVertexBuffer;
     vertexDeclarationQuad[0].format = VertexFloat3;
     vertexDeclarationQuad[0].offset = 0;
@@ -577,7 +504,6 @@ int main(int argc, char* argv[]) {
         glfwPollEvents();
     }
 
-    Model::destroy(heapAllocator, model);
     ModelInstance::destroy(heapAllocator, modelInstance0);
     ModelInstance::destroy(heapAllocator, modelInstance1);
     Material::destroy(heapAllocator, material0);
@@ -593,14 +519,8 @@ int main(int argc, char* argv[]) {
     device.destroyTexture(albedo);
     device.destoryRenderbuffer(depth);
     device.destroyFramebuffer(gBuffer);
-    device.destroyVertexBuffer(vertexBuffer);
-    device.destroyVertexBuffer(normalBuffer);
-    device.destroyVertexBuffer(textureBuffer);
-    device.destroyVertexBuffer(colorBuffer);
-    device.destroyIndexBuffer(indexBuffer);
     device.destroyConstantBuffer(constantBuffer0);
     device.destroyConstantBuffer(constantBuffer1);
-    device.destroyVertexArray(vertexArray);
     device.destroyVertexBuffer(quadVertexBuffer);
     device.destroyVertexBuffer(quadTextureBuffer);
     device.destroyIndexBuffer(quadIndexBuffer);

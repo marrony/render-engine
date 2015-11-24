@@ -62,7 +62,7 @@ const VertexFormat VertexFloat2 = {2, GL_FLOAT};
 const VertexFormat VertexFloat3 = {3, GL_FLOAT};
 const VertexFormat VertexFloat4 = {4, GL_FLOAT};
 
-struct VertexDeclarationDesc {
+struct VertexDeclaration {
     VertexFormat format;
     uint32_t stride;
     void* offset;
@@ -160,7 +160,7 @@ public:
         glUniformBlockBinding(program.id, index, bindingPoint); CHECK_ERROR;
     }
 
-    VertexArray createVertexArray(const VertexDeclarationDesc* vertexDeclarationDesc, int size,
+    VertexArray createVertexArray(const VertexDeclaration* vertexDeclarations, int size,
                                   IndexBuffer indexBuffer) {
         GLuint vao;
 
@@ -171,10 +171,10 @@ public:
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer.id); CHECK_ERROR;
 
         for (int i = 0; i < size; i++) {
-            VertexFormat format = vertexDeclarationDesc[i].format;
-            uint32_t stride = vertexDeclarationDesc[i].stride;
-            void* offset = vertexDeclarationDesc[i].offset;
-            VertexBuffer vertexBuffer = vertexDeclarationDesc[i].buffer;
+            VertexFormat format = vertexDeclarations[i].format;
+            uint32_t stride = vertexDeclarations[i].stride;
+            void* offset = vertexDeclarations[i].offset;
+            VertexBuffer vertexBuffer = vertexDeclarations[i].buffer;
 
             glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id); CHECK_ERROR;
 
@@ -189,14 +189,31 @@ public:
         return {vao};
     }
 
-    Sampler createSampler(int type) {
+    Sampler createSampler(int minFilter, int magFilter, int mipFilter = GL_NONE) {
+        assert(minFilter == GL_NEAREST || minFilter == GL_LINEAR);
+        assert(magFilter == GL_NEAREST || magFilter == GL_LINEAR);
+        assert(mipFilter == GL_NEAREST || mipFilter == GL_LINEAR || mipFilter == GL_NONE);
+
         GLuint sampler;
 
         glGenSamplers(1, &sampler); CHECK_ERROR;
         glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
         glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
-        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, type); CHECK_ERROR;
-        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, type); CHECK_ERROR;
+
+        if(minFilter == GL_NEAREST && mipFilter == GL_NEAREST)
+            minFilter = GL_NEAREST_MIPMAP_NEAREST;
+
+        if(minFilter == GL_NEAREST && mipFilter == GL_LINEAR)
+            minFilter = GL_NEAREST_MIPMAP_LINEAR;
+
+        if(minFilter == GL_LINEAR && mipFilter == GL_NEAREST)
+            minFilter = GL_LINEAR_MIPMAP_NEAREST;
+
+        if(minFilter == GL_LINEAR && mipFilter == GL_LINEAR)
+            minFilter = GL_LINEAR_MIPMAP_LINEAR;
+
+        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, minFilter); CHECK_ERROR;
+        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, magFilter); CHECK_ERROR;
 
         samplerCount++;
 
