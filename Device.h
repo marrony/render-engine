@@ -340,7 +340,7 @@ public:
                 char info[1024];
 
                 glGetShaderInfoLog(geometryShader, 1024, nullptr, info);
-                printf("vertexShader: %s\n", info);
+                printf("geometryShader: %s\n", info);
                 exit(-1);
             }
         }
@@ -373,7 +373,7 @@ public:
             char info[1024];
 
             glGetShaderInfoLog(fragmentShader, 1024, nullptr, info);
-            printf("vertexShader: %s\n", info);
+            printf("fragmentShader: %s\n", info);
             exit(-1);
         }
 

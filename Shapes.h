@@ -7,18 +7,6 @@
 
 #include <vector>
 
-struct Vector2 {
-    float x, y;
-};
-
-struct Vector3 {
-    float x, y, z;
-};
-
-struct Vector4 {
-    float x, y, z, w;
-};
-
 void createSphere(float size, int numberSlices,
                   std::vector<Vector3>& vertex, std::vector<Vector3>& normal,
                   std::vector<Vector2>& texture, std::vector<uint16_t>& indices) {

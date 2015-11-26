@@ -10,8 +10,6 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-#define STR(x) #x
-
 void check_error(const char* file, int line) {
     switch (glGetError()) {
         case GL_NO_ERROR:
@@ -51,200 +49,27 @@ void check_error(const char* file, int line) {
 
 #define CHECK_ERROR check_error(__FILE__, __LINE__)
 
+struct Vector2 {
+    float x, y;
+};
+
+struct Vector3 {
+    float x, y, z;
+};
+
+struct Vector4 {
+    float x, y, z, w;
+};
+
 #include "Allocator.h"
 #include "Device.h"
 #include "Commands.h"
 #include "RenderQueue.h"
 #include "Text.h"
-#include "Model.h"
+#include "Material.h"
 #include "ModelManager.h"
 #include "TextureManager.h"
-
-const char* vertexSource = STR(
-        layout(location = 0) in vec3 in_Position;
-        layout(location = 1) in vec3 in_Normal;
-        layout(location = 2) in vec2 in_Texture;
-        layout(location = 3) in vec3 in_Color;
-
-        layout(std140) uniform in_ShaderData {
-            uniform mat3 in_Rotation;
-            uniform vec4 in_Color2[4];
-            uniform vec4 in_Offset_Scale[4];
-        };
-
-        out VertexData {
-            vec3 position;
-            vec3 normal;
-            vec2 texture;
-            vec4 color;
-        } vtx;
-
-        void main() {
-            vec3 offset = in_Offset_Scale[gl_InstanceID].xyz;
-            float scale = in_Offset_Scale[gl_InstanceID].w;
-            vtx.position = (in_Rotation * in_Position * scale) + offset;
-            gl_Position = vec4(vtx.position, 1);
-            vtx.texture = in_Texture;
-            vtx.normal = in_Rotation * in_Normal;
-            //vtx.color = vec4(in_Color, 1);
-            vtx.color = in_Color2[gl_InstanceID];
-        }
-);
-
-const char* geometrySource = STR(
-        layout (triangles) in;
-        layout (triangle_strip, max_vertices=3) out;
-
-        in VertexData {
-            vec3 position;
-            vec3 normal;
-            vec2 texture;
-            vec4 color;
-        } vtx[];
-
-
-        out GeometryData {
-            vec3 position;
-            vec3 normal;
-            vec2 texture;
-            vec4 color;
-        } geo;
-
-        void main() {
-            gl_Position = gl_in[0].gl_Position;
-            geo.position = vtx[0].position;
-            geo.normal = vtx[0].normal;
-            geo.texture = vtx[0].texture;
-            geo.color = vtx[0].color;
-            EmitVertex();
-
-            gl_Position = gl_in[1].gl_Position;
-            geo.position = vtx[1].position;
-            geo.normal = vtx[1].normal;
-            geo.texture = vtx[1].texture;
-            geo.color = vtx[1].color;
-            EmitVertex();
-
-            gl_Position = gl_in[2].gl_Position;
-            geo.position = vtx[2].position;
-            geo.normal = vtx[2].normal;
-            geo.texture = vtx[2].texture;
-            geo.color = vtx[2].color;
-            EmitVertex();
-
-            EndPrimitive();
-        }
-);
-
-const char* fragmentSource = STR(
-        in VertexData {
-            vec3 position;
-            vec3 normal;
-            vec2 texture;
-            vec4 color;
-        } vtx;
-
-        in GeometryData {
-            vec3 position;
-            vec3 normal;
-            vec2 texture;
-            vec4 color;
-        } geo;
-
-        layout(std140) uniform in_ShaderData {
-            uniform mat3 in_Rotation;
-            uniform vec4 in_Color2[4];
-            uniform vec4 in_Offset_Scale[4];
-        };
-
-        uniform sampler2D in_Sampler;
-
-        layout(location = 0) out vec3 out_Position;
-        layout(location = 1) out vec3 out_Normal;
-        layout(location = 2) out vec4 out_Albedo;
-
-        void main() {
-            out_Position = geo.position;
-            out_Normal = normalize(geo.normal);
-            out_Albedo.rgb = texture(in_Sampler, geo.texture).rgb * geo.color.rgb;
-            out_Albedo.w = 1;
-        }
-);
-
-const char* quadVertexSource = STR(
-        layout(location = 0) in vec3 in_Position;
-        layout(location = 1) in vec2 in_Texture;
-
-        out vec2 vtx_Texture;
-
-        void main() {
-            gl_Position = vec4(in_Position, 1);
-            vtx_Texture = in_Texture;
-        }
-);
-
-const char* quadGeometrySource = STR(
-        layout (triangles) in;
-        layout (triangle_strip, max_vertices=4) out;
-
-        in vec2 vtx_Texture[];
-
-        out vec2 geo_Texture;
-
-        void main() {
-            gl_Position = gl_in[0].gl_Position;
-            geo_Texture = vtx_Texture[0];
-            EmitVertex();
-
-            gl_Position = gl_in[1].gl_Position;
-            geo_Texture = vtx_Texture[1];
-            EmitVertex();
-
-            gl_Position = (gl_in[0].gl_Position + gl_in[2].gl_Position) * 0.5;
-            geo_Texture = (vtx_Texture[0] + vtx_Texture[2]) * 0.5;
-            EmitVertex();
-
-            gl_Position = gl_in[2].gl_Position;
-            geo_Texture = vtx_Texture[2];
-            EmitVertex();
-
-            EndPrimitive();
-        }
-);
-
-const char* quadFragmentSource = STR(
-        in vec2 geo_Texture;
-
-        layout(std140) uniform in_LightData {
-            vec3 in_LightPos[3];
-        };
-
-        uniform sampler2D in_Position;
-        uniform sampler2D in_Normal;
-        uniform sampler2D in_Albedo;
-
-        layout(location = 0) out vec4 out_FragColor;
-
-        vec3 calculateLight(vec3 position, vec3 normal, vec4 albedo, vec3 lightPos, vec3 lightColor) {
-            vec3 lightVec = lightPos - position;
-            vec3 lightDir = normalize(lightVec);
-            return max(dot(normal, lightDir), 0) * albedo.rgb * lightColor;
-        }
-
-        void main() {
-            vec3 position = texture(in_Position, geo_Texture).rgb;
-            vec3 normal = texture(in_Normal, geo_Texture).rgb;
-            vec4 albedo = texture(in_Albedo, geo_Texture);
-
-            vec3 lighting = albedo.rgb * 0.2;
-            lighting += calculateLight(position, normal, albedo, in_LightPos[0], vec3(1, 0, 0));
-            lighting += calculateLight(position, normal, albedo, in_LightPos[1], vec3(0, 1, 0));
-            lighting += calculateLight(position, normal, albedo, in_LightPos[2], vec3(0, 0, 1));
-
-            out_FragColor.rgb = lighting;
-            out_FragColor.a = 1;
-        }
-);
+#include "Shaders.h"
 
 Viewport viewport = {};
 
@@ -310,63 +135,62 @@ int main(int argc, char* argv[]) {
     Program program = device.createProgram(vertexSource, fragmentSource, geometrySource);
 
     struct In_vertexData {
-        float in_Rotation[12];
-        float in_Color0[4];
-        float in_Color1[4];
-        float in_Color2[4];
-        float in_Color3[4];
-        float in_Offset_Scale0[4];
-        float in_Offset_Scale1[4];
-        float in_Offset_Scale2[4];
-        float in_Offset_Scale3[4];
+        Vector4 in_Rotation[3];
+        Vector4 in_Color;
+        Vector4 in_Offset_Scale;
     };
 
-    In_vertexData in_vertexData0 = {
-              1, 0, 0, 0,
-              0, 1, 0, 0,
-              0, 0, 1, 0,
-              1, 1, 1, 1, //color
-              1, 1, 1, 1,
-              1, 1, 1, 1,
-              1, 1, 1, 1,
-              -.5, -.5, 0, 0.35, //offset/scale
-              -.5, +.5, 0, 0.35,
-              +.5, +.5, 0, 0.35,
-              +.5, -.5, 0, 0.35,
+    In_vertexData in_vertexData0[4];
+    In_vertexData in_vertexData1[1];
+
+    Vector4 offsetScale[4] = {
+            -.5, -.5, 0, 0.35, //offset/scale
+            -.5, +.5, 0, 0.35,
+            +.5, +.5, 0, 0.35,
+            +.5, -.5, 0, 0.35,
     };
 
-    In_vertexData in_vertexData1 = {
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            1, 1, 1, 1, //color
-            1, 1, 1, 1,
-            1, 1, 1, 1,
-            1, 1, 1, 1,
-            0, 0, 0, 0.35, //offset/scale
-            0, 0, 0, 0.35,
-            0, 0, 0, 0.35,
-            0, 0, 0, 0.35,
-    };
+    for(int i = 0; i < 4; i++) {
+        in_vertexData0[i].in_Rotation[0] = {1, 0, 0, 0};
+        in_vertexData0[i].in_Rotation[1] = {0, 1, 0, 0};
+        in_vertexData0[i].in_Rotation[2] = {0, 0, 1, 0};
+        in_vertexData0[i].in_Color = {1, 1, 1, 1};
+        in_vertexData0[i].in_Offset_Scale = offsetScale[i];
+    }
+
+    in_vertexData1[0].in_Rotation[0] = {1, 0, 0, 0};
+    in_vertexData1[0].in_Rotation[1] = {0, 1, 0, 0};
+    in_vertexData1[0].in_Rotation[2] = {0, 0, 1, 0};
+    in_vertexData1[0].in_Color = {1, 1, 1, 1};
+    in_vertexData1[0].in_Offset_Scale = {0, 0, 0, 0.35};
 
     Texture2D texture0 = textureManager.loadTexture("images/lion.tga");
     Sampler sampler0 = textureManager.getNearest();
-    Material* material0 = Material::create(heapAllocator, program, texture0, sampler0, device.getUniformLocation(program, "in_Sampler"));
 
-    Texture2D texture1 = textureManager.loadTexture("images/lion.tga");
+    Texture2D texture1 = textureManager.loadTexture("images/lion_ddn.tga");
     Sampler sampler1 = textureManager.getLinear();
-    Material* material1 = Material::create(heapAllocator, program, texture1, sampler1, device.getUniformLocation(program, "in_Sampler"));
 
-    device.setConstantBufferBindingPoint(program, "in_ShaderData", 0);
-    ConstantBuffer constantBuffer0 = device.createConstantBuffer(sizeof(In_vertexData));
-    ConstantBuffer constantBuffer1 = device.createConstantBuffer(sizeof(In_vertexData));
+    MaterialBumpedDiffuse bumpedDiffuse;
+    bumpedDiffuse.program = program;
+    bumpedDiffuse.mainUnit = device.getUniformLocation(program, "in_MainTex");
+    bumpedDiffuse.mainTex = texture0;
+    bumpedDiffuse.mainSampler = sampler0;
+    bumpedDiffuse.bumpUnit = device.getUniformLocation(program, "in_BumpMap");
+    bumpedDiffuse.bumpMap = texture1;
+    bumpedDiffuse.bumpSampler = sampler1;
+    Material* material0 = Material::create(heapAllocator, &bumpedDiffuse);
+    Material* material1 = Material::create(heapAllocator, &bumpedDiffuse);
+
+    device.setConstantBufferBindingPoint(program, "in_InstanceData", 0);
+    ConstantBuffer constantBuffer0 = device.createConstantBuffer(4 * sizeof(In_vertexData));
+    ConstantBuffer constantBuffer1 = device.createConstantBuffer(1 * sizeof(In_vertexData));
 
     Model* model = modelManager.createSphere("sphere01", 1.0, 20);
 
-    ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, &in_vertexData0, sizeof(In_vertexData));
+    ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, in_vertexData0, 4 * sizeof(In_vertexData));
     ModelInstance::setMaterial(modelInstance0, 0, material0);
 
-    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 1, constantBuffer1, &in_vertexData1, sizeof(In_vertexData));
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 1, constantBuffer1, in_vertexData1, 1 * sizeof(In_vertexData));
     ModelInstance::setMaterial(modelInstance1, 0, material1);
 
     modelManager.destroyModel(model);
@@ -473,27 +297,37 @@ int main(int argc, char* argv[]) {
 
         angle += 0.005;
 
-        //rotate x-axis
-        in_vertexData0.in_Rotation[5] = cos;
-        in_vertexData0.in_Rotation[6] = -sin;
-        in_vertexData0.in_Rotation[9] = sin;
-        in_vertexData0.in_Rotation[10] = cos;
+        std::function<void(Vector4[])> rotateX = [cos, sin](Vector4 matrix[]) {
+            matrix[1].y = cos;
+            matrix[1].z = -sin;
+            matrix[2].y = sin;
+            matrix[2].z = cos;
+        };
 
-        //rotate z-axis
-        in_vertexData1.in_Rotation[0] = cos;
-        in_vertexData1.in_Rotation[1] = -sin;
-        in_vertexData1.in_Rotation[4] = sin;
-        in_vertexData1.in_Rotation[5] = cos;
+        std::function<void(Vector4[])> rotateY = [cos, sin](Vector4 matrix[]) {
+            matrix[0].x = cos;
+            matrix[0].z = sin;
+            matrix[2].x = -sin;
+            matrix[2].z = cos;
+        };
 
-        //rotate y-axis
-//        in_vertexData.in_Rotation[0] = cos;
-//        in_vertexData.in_Rotation[2] = sin;
-//        in_vertexData.in_Rotation[8] = -sin;
-//        in_vertexData.in_Rotation[10] = cos;
+        std::function<void(Vector4[])> rotateZ = [cos, sin](Vector4 matrix[]) {
+            matrix[0].x = cos;
+            matrix[0].y = -sin;
+            matrix[1].x = sin;
+            matrix[1].y = cos;
+        };
 
-        in_vertexData0.in_Color2[0] -= 0.00001;
-        in_vertexData0.in_Color2[1] -= 0.00002;
-        in_vertexData0.in_Color2[2] -= 0.00003;
+        rotateX(in_vertexData0[0].in_Rotation);
+        rotateY(in_vertexData0[1].in_Rotation);
+        rotateZ(in_vertexData0[2].in_Rotation);
+        rotateX(in_vertexData0[3].in_Rotation);
+
+        rotateX(in_vertexData1[0].in_Rotation);
+
+//        in_vertexData0.in_Color[0].x -= 0.00001;
+//        in_vertexData0.in_Color[0].y -= 0.00002;
+//        in_vertexData0.in_Color[0].z -= 0.00003;
 
         CommandBuffer::execute(commandBuffer, device);
 

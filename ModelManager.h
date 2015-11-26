@@ -6,6 +6,9 @@
 #define MODEL_MANAGER_H
 
 #include "Shapes.h"
+#include "Model.h"
+#include "Material.h"
+#include "ModelInstance.h"
 
 const int MAX_MODEL_NAME = 8;
 
@@ -21,6 +24,16 @@ public:
         assert(modelCount == 0);
 
         allocator.deallocate(models);
+    }
+
+    Model* findModel(const char* name) {
+        for(uint32_t i = 0; i < modelCount; i++) {
+            if(strncmp(models[i].name, name, MAX_MODEL_NAME) == 0) {
+                models[i].refs++;
+                return models[i].model;
+            }
+        }
+        return nullptr;
     }
 
     Model* createSphere(const char* name, float size, int numberSlices) {

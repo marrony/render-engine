@@ -5,6 +5,8 @@
 #ifndef TEXT_H
 #define TEXT_H
 
+#define STR(x) #x
+
 const char* vertexFontSource = STR(
         layout(location = 0) in vec4 in_Vertex;
 
@@ -29,6 +31,8 @@ const char* fragmentFontSource = STR(
             out_FragColor = vec4(in_Color, 1.0) * sampled;
         }
 );
+
+#undef STR
 
 struct Font {
     int id;
