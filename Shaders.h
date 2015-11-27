@@ -10,7 +10,8 @@
 const char* vertexSource = STR(
 layout(location = 0) in vec3 in_Position;
 layout(location = 1) in vec3 in_Normal;
-layout(location = 2) in vec2 in_Texture;
+layout(location = 2) in vec3 in_Tangent;
+layout(location = 3) in vec2 in_Texture;
 
 struct InstanceData {
     mat3 in_Rotation;
@@ -24,7 +25,7 @@ layout(std140) uniform in_InstanceData {
 
 out VertexData {
     vec3 position;
-    vec3 normal;
+    mat3 tbn;
     vec2 texture;
     vec4 color;
 } vtx;
@@ -35,7 +36,12 @@ void main() {
     vtx.position = (instanceData[gl_InstanceID].in_Rotation * in_Position * scale) + offset;
     gl_Position = vec4(vtx.position, 1);
     vtx.texture = in_Texture;
-    vtx.normal = instanceData[gl_InstanceID].in_Rotation * in_Normal;
+
+    vec3 normal = normalize(instanceData[gl_InstanceID].in_Rotation * in_Normal);
+    vec3 tangent = normalize(instanceData[gl_InstanceID].in_Rotation * in_Tangent);
+    vec3 bitangent = cross(tangent, normal);
+
+    vtx.tbn = mat3(tangent, bitangent, normal);
     vtx.color = instanceData[gl_InstanceID].in_Color;
 }
 );
@@ -46,7 +52,7 @@ layout (triangle_strip, max_vertices=3) out;
 
 in VertexData {
     vec3 position;
-    vec3 normal;
+    mat3 tbn;
     vec2 texture;
     vec4 color;
 } vtx[];
@@ -54,7 +60,7 @@ in VertexData {
 
 out GeometryData {
     vec3 position;
-    vec3 normal;
+    mat3 tbn;
     vec2 texture;
     vec4 color;
 } geo;
@@ -62,21 +68,21 @@ out GeometryData {
 void main() {
     gl_Position = gl_in[0].gl_Position;
     geo.position = vtx[0].position;
-    geo.normal = vtx[0].normal;
+    geo.tbn = vtx[0].tbn;
     geo.texture = vtx[0].texture;
     geo.color = vtx[0].color;
     EmitVertex();
 
     gl_Position = gl_in[1].gl_Position;
     geo.position = vtx[1].position;
-    geo.normal = vtx[1].normal;
+    geo.tbn = vtx[1].tbn;
     geo.texture = vtx[1].texture;
     geo.color = vtx[1].color;
     EmitVertex();
 
     gl_Position = gl_in[2].gl_Position;
     geo.position = vtx[2].position;
-    geo.normal = vtx[2].normal;
+    geo.tbn = vtx[2].tbn;
     geo.texture = vtx[2].texture;
     geo.color = vtx[2].color;
     EmitVertex();
@@ -88,14 +94,14 @@ void main() {
 const char* fragmentSource = STR(
 in VertexData {
     vec3 position;
-    vec3 normal;
+    mat3 tbn;
     vec2 texture;
     vec4 color;
 } vtx;
 
 in GeometryData {
     vec3 position;
-    vec3 normal;
+    mat3 tbn;
     vec2 texture;
     vec4 color;
 } geo;
@@ -118,8 +124,10 @@ layout(location = 1) out vec3 out_Normal;
 layout(location = 2) out vec4 out_Albedo;
 
 void main() {
+    vec3 normal = texture(in_BumpMap, geo.texture).xyz * 2.0 - 1.0;
+
     out_Position = geo.position;
-    out_Normal = normalize(geo.normal);
+    out_Normal = normalize(geo.tbn * normal);
     out_Albedo.rgb = texture(in_MainTex, geo.texture).rgb * geo.color.rgb;
     out_Albedo.w = 1;
 }
@@ -191,9 +199,9 @@ void main() {
     vec4 albedo = texture(in_Albedo, geo_Texture);
 
     vec3 lighting = albedo.rgb * 0.2;
-    lighting += calculateLight(position, normal, albedo, in_LightPos[0], vec3(1, 0, 0));
-    lighting += calculateLight(position, normal, albedo, in_LightPos[1], vec3(0, 1, 0));
-    lighting += calculateLight(position, normal, albedo, in_LightPos[2], vec3(0, 0, 1));
+    lighting += calculateLight(position, normal, albedo, in_LightPos[0], vec3(1.0, 0.5, 0.5));
+    lighting += calculateLight(position, normal, albedo, in_LightPos[1], vec3(0.5, 1.0, 0.5));
+    lighting += calculateLight(position, normal, albedo, in_LightPos[2], vec3(0.5, 0.5, 1.0));
 
     out_FragColor.rgb = lighting;
     out_FragColor.a = 1;

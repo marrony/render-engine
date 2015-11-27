@@ -220,7 +220,7 @@ public:
         return {sampler};
     }
 
-    Texture2D createFloat16Texture(int width, int height, const void* pixels) {
+    Texture2D createRGB16FTexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId); CHECK_ERROR;
 
@@ -237,7 +237,24 @@ public:
         return {texId};
     }
 
-    Texture2D createFloat32Texture(int width, int height, const void* pixels) {
+    Texture2D createRGBA16FTexture(int width, int height, const void* pixels) {
+        GLuint texId;
+        glGenTextures(1, &texId); CHECK_ERROR;
+
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        textureCount++;
+
+        return {texId};
+    }
+
+    Texture2D createRGB32FTexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId); CHECK_ERROR;
 
@@ -254,7 +271,24 @@ public:
         return {texId};
     }
 
-    Texture2D createRgbaTexture(int width, int height, const void* pixels) {
+    Texture2D createRGBA32FTexture(int width, int height, const void* pixels) {
+        GLuint texId;
+        glGenTextures(1, &texId); CHECK_ERROR;
+
+        glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, pixels); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR; CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        textureCount++;
+
+        return {texId};
+    }
+
+    Texture2D createRGBATexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId); CHECK_ERROR;
 
@@ -272,7 +306,7 @@ public:
         return {texId};
     }
 
-    Texture2D createRgbTexture(int width, int height, const void* pixels) {
+    Texture2D createRGBTexture(int width, int height, const void* pixels) {
         GLuint texId;
         glGenTextures(1, &texId); CHECK_ERROR;
 

@@ -91,7 +91,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 }
 
 void framebuffer_callback(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
+    viewport.width = width;
+    viewport.height = height;
 }
 
 int main(int argc, char* argv[]) {
@@ -165,19 +166,16 @@ int main(int argc, char* argv[]) {
     in_vertexData1[0].in_Offset_Scale = {0, 0, 0, 0.35};
 
     Texture2D texture0 = textureManager.loadTexture("images/lion.tga");
-    Sampler sampler0 = textureManager.getNearest();
-
     Texture2D texture1 = textureManager.loadTexture("images/lion_ddn.tga");
-    Sampler sampler1 = textureManager.getLinear();
 
     MaterialBumpedDiffuse bumpedDiffuse;
     bumpedDiffuse.program = program;
     bumpedDiffuse.mainUnit = device.getUniformLocation(program, "in_MainTex");
     bumpedDiffuse.mainTex = texture0;
-    bumpedDiffuse.mainSampler = sampler0;
+    bumpedDiffuse.mainSampler = textureManager.getLinear();
     bumpedDiffuse.bumpUnit = device.getUniformLocation(program, "in_BumpMap");
     bumpedDiffuse.bumpMap = texture1;
-    bumpedDiffuse.bumpSampler = sampler1;
+    bumpedDiffuse.bumpSampler = textureManager.getNearest();
     Material* material0 = Material::create(heapAllocator, &bumpedDiffuse);
     Material* material1 = Material::create(heapAllocator, &bumpedDiffuse);
 
@@ -200,12 +198,12 @@ int main(int argc, char* argv[]) {
     glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
     glViewport(0, 0, viewport.width, viewport.height);
 
-    int wgbuffer = 512;
-    int hgbuffer = 512;
+    int wgbuffer = 1024;
+    int hgbuffer = 768;
     Framebuffer gBuffer = device.createFramebuffer();
-    Texture2D position = device.createFloat32Texture(wgbuffer, hgbuffer, nullptr);
-    Texture2D normal = device.createFloat32Texture(wgbuffer, hgbuffer, nullptr);
-    Texture2D albedo = device.createRgbaTexture(wgbuffer, hgbuffer, nullptr);
+    Texture2D position = device.createRGB32FTexture(wgbuffer, hgbuffer, nullptr);
+    Texture2D normal = device.createRGB32FTexture(wgbuffer, hgbuffer, nullptr);
+    Texture2D albedo = device.createRGBATexture(wgbuffer, hgbuffer, nullptr);
     Renderbuffer depth = device.createRenderbuffer(wgbuffer, hgbuffer);
 
     device.bindTextureToFramebuffer(gBuffer, position, 0);

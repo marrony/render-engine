@@ -25,8 +25,8 @@ struct Material {
         BindProgram::create(material->state, diffuse->program);
         BindTexture::create(material->state, diffuse->program, diffuse->mainTex, diffuse->mainUnit);
         BindSampler::create(material->state, diffuse->program, diffuse->mainSampler, diffuse->mainUnit);
-        //BindTexture::create(material->state, diffuse->program, diffuse->bumpMap, diffuse->bumpUnit);
-        //BindSampler::create(material->state, diffuse->program, diffuse->bumpSampler, diffuse->bumpUnit);
+        BindTexture::create(material->state, diffuse->program, diffuse->bumpMap, diffuse->bumpUnit);
+        BindSampler::create(material->state, diffuse->program, diffuse->bumpSampler, diffuse->bumpUnit);
         return material;
     }
 

@@ -52,7 +52,7 @@ public:
 
         textures[index].refs = 1;
         textures[index].filename = filename;
-        textures[index].texture = device.createRgbTexture(tgaWidth, tgaHeight, tgaPixels);
+        textures[index].texture = device.createRGBTexture(tgaWidth, tgaHeight, tgaPixels);
 
         delete[] tgaPixels;
 

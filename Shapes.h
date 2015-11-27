@@ -9,7 +9,8 @@
 
 void createSphere(float size, int numberSlices,
                   std::vector<Vector3>& vertex, std::vector<Vector3>& normal,
-                  std::vector<Vector2>& texture, std::vector<uint16_t>& indices) {
+                  std::vector<Vector3>& tangent, std::vector<Vector2>& texture,
+                  std::vector<uint16_t>& indices) {
 
     int numberParallels = numberSlices / 2;
     int numberVertices = (numberParallels + 1) * (numberSlices + 1);
@@ -18,6 +19,7 @@ void createSphere(float size, int numberSlices,
 
     vertex.resize(numberVertices);
     normal.resize(numberVertices);
+    tangent.resize(numberVertices);
     texture.resize(numberVertices);
     indices.resize(numberIndices);
 
@@ -35,6 +37,27 @@ void createSphere(float size, int numberSlices,
 
             texture[index].x = (float) j / (float) numberSlices;
             texture[index].y = 1.0f - (float) i / (float) numberParallels;
+
+            //TODO fix this
+            Vector3 matrix[3] = {
+                    1, 0, 0,
+                    0, 1, 0,
+                    0, 0, 1,
+            };
+
+            float angle = texture[index].x;
+            float cos = cosf(angle);
+            float sin = sinf(angle);
+
+            matrix[0].x = cos;
+            matrix[0].z = sin;
+            matrix[2].x = -sin;
+            matrix[2].z = cos;
+
+            Vector3 v = {1, 0, 0};
+            tangent[index].x = matrix[0].x*v.x + matrix[0].y*v.y + matrix[0].z*v.z;
+            tangent[index].y = matrix[1].x*v.x + matrix[1].y*v.y + matrix[1].z*v.z;
+            tangent[index].z = matrix[2].x*v.x + matrix[2].y*v.y + matrix[2].z*v.z;
         }
     }
 
