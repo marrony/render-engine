@@ -14,6 +14,7 @@ enum CommandType {
     BIND_FRAMEBUFFER,
     SET_VIEWPORT,
     SET_DEPTH_TEST,
+    SET_BLEND,
     CLEAR_COLOR0,
     CLEAR_COLOR1,
     CLEAR_COLOR2,
@@ -200,6 +201,36 @@ struct SetDepthTest {
     }
 };
 
+struct SetBlend {
+    Command command;
+    bool enable;
+    int index;
+    int equation;
+    int src;
+    int dst;
+
+    static const uint32_t TYPE = SET_BLEND;
+
+    static void create(CommandBuffer* commandBuffer, bool enable, int index, int equation, int src, int dst) {
+        SetBlend* setBlend = getCommand<SetBlend>(commandBuffer);
+        setBlend->enable = enable;
+        setBlend->index = index;
+        setBlend->equation = equation;
+        setBlend->src = src;
+        setBlend->dst = dst;
+    }
+
+    static void submit(Device& device, SetBlend* cmd) {
+        if(cmd->enable) {
+            glEnablei(GL_BLEND, cmd->index);
+            glBlendEquationSeparatei(cmd->index, cmd->equation, cmd->equation);
+            glBlendFuncSeparatei(cmd->index, cmd->src, cmd->dst, cmd->src, cmd->dst);
+        } else {
+            glDisablei(GL_BLEND, cmd->index);
+        }
+    }
+};
+
 struct CopyConstantBuffer {
     Command command;
     ConstantBuffer constantBuffer;
@@ -358,6 +389,7 @@ const FnSubmitCommand submitCommand[] = {
         [BIND_FRAMEBUFFER] = FnSubmitCommand(BindFramebuffer::submit),
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
         [SET_DEPTH_TEST] = FnSubmitCommand(SetDepthTest::submit),
+        [SET_BLEND] = FnSubmitCommand(SetBlend::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
         [BIND_CONSTANT_BUFFER] = FnSubmitCommand(BindConstantBuffer::submit),
         [BIND_VERTEX_ARRAY] = FnSubmitCommand(BindVertexArray::submit),
@@ -378,6 +410,7 @@ const int sizeCommand[] = {
         [BIND_FRAMEBUFFER] = sizeof(BindFramebuffer),
         [SET_VIEWPORT] = sizeof(SetViewport),
         [SET_DEPTH_TEST] = sizeof(SetDepthTest),
+        [SET_BLEND] = sizeof(SetBlend),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
         [BIND_CONSTANT_BUFFER] = sizeof(BindConstantBuffer),
         [BIND_VERTEX_ARRAY] = sizeof(BindVertexArray),

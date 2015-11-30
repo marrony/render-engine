@@ -37,6 +37,10 @@ struct Program {
     GLuint id;
 };
 
+struct SeparateProgram {
+    GLuint id;
+};
+
 struct Framebuffer {
     GLuint id;
 };
@@ -79,6 +83,8 @@ public:
         textureCount = 0;
         samplerCount = 0;
         programCount = 0;
+        vertexProgramCount = 0;
+        fragmentProgramCount = 0;
         framebufferCount = 0;
         renderbufferCount = 0;
     }
@@ -91,6 +97,8 @@ public:
         assert(textureCount == 0);
         assert(samplerCount == 0);
         assert(programCount == 0);
+        assert(vertexProgramCount == 0);
+        assert(fragmentProgramCount == 0);
         assert(framebufferCount == 0);
         assert(renderbufferCount == 0);
     }
@@ -356,18 +364,68 @@ public:
         return {texId};
     }
 
-    Program createProgram(const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
+    SeparateProgram createVertexProgram(const char* commonSource, const char* source) {
+        const char* source2[] = {
+                "#version 410 core\n",
+                "#define SEPARATE_VERTEX_SHADER\n",
+                commonSource,
+                source
+        };
+
+        GLint status;
+        GLuint program = glCreateShaderProgramv(GL_VERTEX_SHADER, 4, source2);
+        glGetProgramiv(program, GL_LINK_STATUS, &status);
+        if (!status) {
+            char info[1024];
+
+            glGetProgramInfoLog(program, 1024, nullptr, info);
+            printf("program: %s\n", info);
+            exit(-1);
+        }
+
+        vertexProgramCount++;
+
+        return {program};
+    }
+
+    SeparateProgram createFragmentProgram(const char* commonSource, const char* source) {
+        const char* source2[] = {
+                "#version 410 core\n",
+                "#define SEPARATE_FRAGMENT_SHADER\n",
+                commonSource,
+                source
+        };
+
+        GLint status;
+        GLuint program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 4, source2);
+        glGetProgramiv(program, GL_LINK_STATUS, &status);
+        if (!status) {
+            char info[1024];
+
+            glGetProgramInfoLog(program, 1024, nullptr, info);
+            printf("program: %s\n", info);
+            exit(-1);
+        }
+
+        fragmentProgramCount++;
+
+        return {program};
+    }
+
+    Program createProgram(const char* commonSource, const char* vertexSource, const char* fragmentSource, const char* geometrySource = nullptr) {
         GLint status;
 
         const char* geometrySource2[] = {
-                "#version 410 core\n", geometrySource
+                "#version 410 core\n",
+                commonSource,
+                geometrySource
         };
 
         GLuint geometryShader = 0;
 
         if(geometrySource != nullptr) {
             geometryShader = glCreateShader(GL_GEOMETRY_SHADER); CHECK_ERROR;
-            glShaderSource(geometryShader, 2, geometrySource2, nullptr); CHECK_ERROR;
+            glShaderSource(geometryShader, 3, geometrySource2, nullptr); CHECK_ERROR;
             glCompileShader(geometryShader); CHECK_ERROR;
             glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &status);
             if (!status) {
@@ -380,11 +438,13 @@ public:
         }
 
         const char* vertexSource2[] = {
-                "#version 410 core\n", vertexSource
+                "#version 410 core\n",
+                commonSource,
+                vertexSource
         };
 
         GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); CHECK_ERROR;
-        glShaderSource(vertexShader, 2, vertexSource2, nullptr); CHECK_ERROR;
+        glShaderSource(vertexShader, 3, vertexSource2, nullptr); CHECK_ERROR;
         glCompileShader(vertexShader); CHECK_ERROR;
         glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
         if (!status) {
@@ -396,11 +456,13 @@ public:
         }
 
         const char* fragmentSource2[] = {
-                "#version 410 core\n", fragmentSource
+                "#version 410 core\n",
+                commonSource,
+                fragmentSource
         };
 
         GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); CHECK_ERROR;
-        glShaderSource(fragmentShader, 2, fragmentSource2, nullptr); CHECK_ERROR;
+        glShaderSource(fragmentShader, 3, fragmentSource2, nullptr); CHECK_ERROR;
         glCompileShader(fragmentShader); CHECK_ERROR;
         glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
         if (!status) {
@@ -527,7 +589,7 @@ public:
         programCount--;
     }
 
-    void destoryRenderbuffer(Renderbuffer renderbuffer) {
+    void destroyRenderbuffer(Renderbuffer renderbuffer) {
         if (renderbuffer.id == 0) return;
 
         glDeleteRenderbuffers(1, &renderbuffer.id);
@@ -666,6 +728,8 @@ private:
     uint32_t textureCount;
     uint32_t samplerCount;
     uint32_t programCount;
+    uint32_t vertexProgramCount;
+    uint32_t fragmentProgramCount;
     uint32_t framebufferCount;
     uint32_t renderbufferCount;
 };

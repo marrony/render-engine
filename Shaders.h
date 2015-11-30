@@ -7,28 +7,52 @@
 
 #define STR(x) #x
 
-const char* vertexSource = STR(
-layout(location = 0) in vec3 in_Position;
-layout(location = 1) in vec3 in_Normal;
-layout(location = 2) in vec3 in_Tangent;
-layout(location = 3) in vec2 in_Texture;
-
+const char* commonSource = STR(
 struct InstanceData {
     mat3 in_Rotation;
     vec4 in_Color;
     vec4 in_Offset_Scale;
 };
 
-layout(std140) uniform in_InstanceData {
-    InstanceData instanceData[4];
-};
-
-out VertexData {
+struct VertexData {
     vec3 position;
     mat3 tbn;
     vec2 texture;
     vec4 color;
-} vtx;
+};
+
+\n#ifdef SEPARATE_VERTEX_SHADER\n
+out gl_PerVertex {
+    vec4 gl_Position;
+    float gl_PointSize;
+    float gl_ClipDistance[];
+};
+\n#endif\n
+
+struct LightData {
+    vec3 position;
+    vec3 color;
+};
+
+vec3 calculateLight(vec3 position, vec3 normal, vec4 albedo, LightData light) {
+    vec3 lightVec = light.position - position;
+    vec3 lightDir = normalize(lightVec);
+    return max(dot(normal, lightDir), 0) * albedo.rgb * light.color;
+}
+
+);
+
+const char* vertexSource = STR(
+layout(location = 0) in vec3 in_Position;
+layout(location = 1) in vec2 in_Texture;
+layout(location = 2) in vec3 in_Normal;
+layout(location = 3) in vec3 in_Tangent;
+
+layout(std140) uniform in_InstanceData {
+    InstanceData instanceData[4];
+};
+
+out VertexData vtx;
 
 void main() {
     vec3 offset = instanceData[gl_InstanceID].in_Offset_Scale.xyz;
@@ -50,20 +74,9 @@ const char* geometrySource = STR(
 layout (triangles) in;
 layout (triangle_strip, max_vertices=3) out;
 
-in VertexData {
-    vec3 position;
-    mat3 tbn;
-    vec2 texture;
-    vec4 color;
-} vtx[];
+in VertexData vtx[];
 
-
-out GeometryData {
-    vec3 position;
-    mat3 tbn;
-    vec2 texture;
-    vec4 color;
-} geo;
+out VertexData geo;
 
 void main() {
     gl_Position = gl_in[0].gl_Position;
@@ -92,25 +105,7 @@ void main() {
 );
 
 const char* fragmentSource = STR(
-in VertexData {
-    vec3 position;
-    mat3 tbn;
-    vec2 texture;
-    vec4 color;
-} vtx;
-
-in GeometryData {
-    vec3 position;
-    mat3 tbn;
-    vec2 texture;
-    vec4 color;
-} geo;
-
-struct InstanceData {
-    mat3 in_Rotation;
-    vec4 in_Color;
-    vec4 in_Offset_Scale;
-};
+in VertexData vtx;
 
 layout(std140) uniform in_InstanceData {
     InstanceData instanceData[4];
@@ -124,15 +119,77 @@ layout(location = 1) out vec3 out_Normal;
 layout(location = 2) out vec4 out_Albedo;
 
 void main() {
-    vec3 normal = texture(in_BumpMap, geo.texture).xyz * 2.0 - 1.0;
+    vec3 normal = texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
 
-    out_Position = geo.position;
-    out_Normal = normalize(geo.tbn * normal);
-    out_Albedo.rgb = texture(in_MainTex, geo.texture).rgb * geo.color.rgb;
+    out_Position = vtx.position;
+    out_Normal = normalize(vtx.tbn * normal);
+    out_Albedo.rgb = texture(in_MainTex, vtx.texture).rgb * vtx.color.rgb;
     out_Albedo.w = 1;
 }
 );
 
+const char* vertexTransparencySource = STR(
+layout(location = 0) in vec3 in_Position;
+layout(location = 1) in vec2 in_Texture;
+layout(location = 2) in vec3 in_Normal;
+layout(location = 3) in vec3 in_Tangent;
+
+layout(std140) uniform in_InstanceData {
+    InstanceData instanceData[4];
+};
+
+out VertexData vtx;
+
+void main() {
+    vec3 offset = instanceData[gl_InstanceID].in_Offset_Scale.xyz;
+    float scale = instanceData[gl_InstanceID].in_Offset_Scale.w;
+    vtx.position = (instanceData[gl_InstanceID].in_Rotation * in_Position * scale) + offset;
+    gl_Position = vec4(vtx.position, 1);
+    vtx.texture = in_Texture;
+
+    vec3 normal = normalize(instanceData[gl_InstanceID].in_Rotation * in_Normal);
+    vec3 tangent = normalize(instanceData[gl_InstanceID].in_Rotation * in_Tangent);
+    vec3 bitangent = cross(tangent, normal);
+
+    vtx.tbn = mat3(tangent, bitangent, normal);
+    vtx.color = instanceData[gl_InstanceID].in_Color;
+}
+);
+
+const char* fragmentTransparencySource = STR(
+in VertexData vtx;
+
+layout(std140) uniform in_InstanceData {
+    InstanceData instanceData[4];
+};
+
+layout(std140) uniform in_LightData {
+    LightData lightData[3];
+};
+
+uniform sampler2D in_MainTex;
+uniform sampler2D in_BumpMap;
+
+layout(location = 0) out vec4 out_Color;
+
+void main() {
+    vec3 normal = texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
+    vec4 albedo = texture(in_MainTex, vtx.texture);
+
+    vec3 position = vtx.position;
+    normal = normalize(vtx.tbn * normal);
+
+    float alpha = 0.5;
+
+    out_Color.rgb = vec3(0); //alpha * albedo.rgb * 0.2;
+    out_Color.rgb += alpha*calculateLight(position, normal, albedo, lightData[0]);
+    out_Color.rgb += alpha*calculateLight(position, normal, albedo, lightData[1]);
+    out_Color.rgb += alpha*calculateLight(position, normal, albedo, lightData[2]);
+    out_Color.a = alpha*alpha*alpha;
+}
+);
+
+////////////////////////////////////////////////////////////////////////////////////
 const char* quadVertexSource = STR(
 layout(location = 0) in vec3 in_Position;
 layout(location = 1) in vec2 in_Texture;
@@ -178,7 +235,7 @@ const char* quadFragmentSource = STR(
 in vec2 geo_Texture;
 
 layout(std140) uniform in_LightData {
-    vec3 in_LightPos[3];
+    LightData lightData[3];
 };
 
 uniform sampler2D in_Position;
@@ -187,24 +244,30 @@ uniform sampler2D in_Albedo;
 
 layout(location = 0) out vec4 out_FragColor;
 
-vec3 calculateLight(vec3 position, vec3 normal, vec4 albedo, vec3 lightPos, vec3 lightColor) {
-    vec3 lightVec = lightPos - position;
-    vec3 lightDir = normalize(lightVec);
-    return max(dot(normal, lightDir), 0) * albedo.rgb * lightColor;
-}
-
 void main() {
     vec3 position = texture(in_Position, geo_Texture).rgb;
     vec3 normal = texture(in_Normal, geo_Texture).rgb;
     vec4 albedo = texture(in_Albedo, geo_Texture);
 
     vec3 lighting = albedo.rgb * 0.2;
-    lighting += calculateLight(position, normal, albedo, in_LightPos[0], vec3(1.0, 0.5, 0.5));
-    lighting += calculateLight(position, normal, albedo, in_LightPos[1], vec3(0.5, 1.0, 0.5));
-    lighting += calculateLight(position, normal, albedo, in_LightPos[2], vec3(0.5, 0.5, 1.0));
+    lighting += calculateLight(position, normal, albedo, lightData[0]);
+    lighting += calculateLight(position, normal, albedo, lightData[1]);
+    lighting += calculateLight(position, normal, albedo, lightData[2]);
 
     out_FragColor.rgb = lighting;
     out_FragColor.a = 1;
+}
+);
+
+const char* copyFragmentSource = STR(
+in vec2 geo_Texture;
+
+uniform sampler2D in_Texture;
+
+layout(location = 0) out vec4 out_FragColor;
+
+void main() {
+    out_FragColor = texture(in_Texture, geo_Texture);
 }
 );
 

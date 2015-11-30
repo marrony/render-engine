@@ -61,25 +61,25 @@ public:
         vertexDeclaration[0].offset = 0;
         vertexDeclaration[0].stride = 0;
 
-        vertexDeclaration[1].buffer = normalBuffer;
-        vertexDeclaration[1].format = VertexFloat3;
+        vertexDeclaration[1].buffer = textureBuffer;
+        vertexDeclaration[1].format = VertexFloat2;
         vertexDeclaration[1].offset = 0;
         vertexDeclaration[1].stride = 0;
 
-        vertexDeclaration[2].buffer = tangentBuffer;
+        vertexDeclaration[2].buffer = normalBuffer;
         vertexDeclaration[2].format = VertexFloat3;
         vertexDeclaration[2].offset = 0;
         vertexDeclaration[2].stride = 0;
 
-        vertexDeclaration[3].buffer = textureBuffer;
-        vertexDeclaration[3].format = VertexFloat2;
+        vertexDeclaration[3].buffer = tangentBuffer;
+        vertexDeclaration[3].format = VertexFloat3;
         vertexDeclaration[3].offset = 0;
         vertexDeclaration[3].stride = 0;
 
         models[index].vertexBuffer[0] = vertexBuffer;
-        models[index].vertexBuffer[1] = normalBuffer;
-        models[index].vertexBuffer[2] = tangentBuffer;
-        models[index].vertexBuffer[3] = textureBuffer;
+        models[index].vertexBuffer[1] = textureBuffer;
+        models[index].vertexBuffer[2] = normalBuffer;
+        models[index].vertexBuffer[3] = tangentBuffer;
         models[index].indexBuffer = indexBuffer;
         models[index].vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
         models[index].model = Model::create(allocator, models[index].vertexArray, 1);
@@ -108,13 +108,27 @@ public:
                 1, 1,
                 1, 0
         };
+        Vector3 normal[] = {
+                0.0, 0.0, 1.0,
+                0.0, 0.0, 1.0,
+                0.0, 0.0, 1.0,
+                0.0, 0.0, 1.0,
+        };
+        Vector3 tangent[] = {
+                1.0, 0.0, 0.0,
+                1.0, 0.0, 0.0,
+                1.0, 0.0, 0.0,
+                1.0, 0.0, 0.0,
+        };
         uint16_t indices[] = {0, 1, 3, 3, 1, 2};
 
         VertexBuffer vertexBuffer = device.createStaticVertexBuffer(sizeof(vertex), vertex);
         VertexBuffer textureBuffer = device.createStaticVertexBuffer(sizeof(texture), texture);
+        VertexBuffer normalBuffer = device.createStaticVertexBuffer(sizeof(normal), normal);
+        VertexBuffer tangentBuffer = device.createStaticVertexBuffer(sizeof(tangent), tangent);
         IndexBuffer indexBuffer = device.createIndexBuffer(sizeof(indices), indices);
 
-        VertexDeclaration vertexDeclaration[2] = {};
+        VertexDeclaration vertexDeclaration[4] = {};
         vertexDeclaration[0].buffer = vertexBuffer;
         vertexDeclaration[0].format = VertexFloat3;
         vertexDeclaration[0].offset = 0;
@@ -125,12 +139,23 @@ public:
         vertexDeclaration[1].offset = 0;
         vertexDeclaration[1].stride = 0;
 
+        vertexDeclaration[2].buffer = normalBuffer;
+        vertexDeclaration[2].format = VertexFloat3;
+        vertexDeclaration[2].offset = 0;
+        vertexDeclaration[2].stride = 0;
+
+        vertexDeclaration[3].buffer = tangentBuffer;
+        vertexDeclaration[3].format = VertexFloat3;
+        vertexDeclaration[3].offset = 0;
+        vertexDeclaration[3].stride = 0;
+
+
         models[index].vertexBuffer[0] = vertexBuffer;
         models[index].vertexBuffer[1] = textureBuffer;
-        models[index].vertexBuffer[2] = {0};
-        models[index].vertexBuffer[3] = {0};
+        models[index].vertexBuffer[2] = normalBuffer;
+        models[index].vertexBuffer[3] = tangentBuffer;
         models[index].indexBuffer = indexBuffer;
-        models[index].vertexArray = device.createVertexArray(vertexDeclaration, 2, indexBuffer);
+        models[index].vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
         models[index].model = Model::create(allocator, models[index].vertexArray, 1);
         strncpy(models[index].name, name, MAX_MODEL_NAME);
         models[index].refs = 1;

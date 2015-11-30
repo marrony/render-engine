@@ -133,7 +133,11 @@ int main(int argc, char* argv[]) {
     Font fontRegular = textManager.loadFont("./fonts/OpenSans-Regular.ttf", 48);
     Font fontItalic = textManager.loadFont("./fonts/OpenSans-Italic.ttf", 48);
 
-    Program program = device.createProgram(vertexSource, fragmentSource, geometrySource);
+    //SeparateProgram vertexProgram = device.createVertexProgram(commonSource, vertexSource);
+    //SeparateProgram fragmentProgram = device.createFragmentProgram(commonSource, fragmentSource);
+
+    Program program = device.createProgram(commonSource, vertexSource, fragmentSource, nullptr);
+    Program programTransparent = device.createProgram(commonSource, vertexTransparencySource, fragmentTransparencySource, nullptr);
 
     struct In_vertexData {
         Vector4 in_Rotation[3];
@@ -142,10 +146,11 @@ int main(int argc, char* argv[]) {
     };
 
     In_vertexData in_vertexData0[4];
-    In_vertexData in_vertexData1[1];
+    In_vertexData in_vertexData1[2];
+    In_vertexData in_vertexData2[1];
 
     Vector4 offsetScale[4] = {
-            -.5, -.5, 0, 0.35, //offset/scale
+            -.0, -.0, 0, 0.35, //offset/scale
             -.5, +.5, 0, 0.35,
             +.5, +.5, 0, 0.35,
             +.5, -.5, 0, 0.35,
@@ -163,10 +168,27 @@ int main(int argc, char* argv[]) {
     in_vertexData1[0].in_Rotation[1] = {0, 1, 0, 0};
     in_vertexData1[0].in_Rotation[2] = {0, 0, 1, 0};
     in_vertexData1[0].in_Color = {1, 1, 1, 1};
-    in_vertexData1[0].in_Offset_Scale = {0, 0, 0, 0.35};
+    in_vertexData1[0].in_Offset_Scale = {-0.5, 0, 0, 0.45};
+
+    in_vertexData1[1].in_Rotation[0] = {1, 0, 0, 0};
+    in_vertexData1[1].in_Rotation[1] = {0, 1, 0, 0};
+    in_vertexData1[1].in_Rotation[2] = {0, 0, 1, 0};
+    in_vertexData1[1].in_Color = {1, 1, 1, 1};
+    in_vertexData1[1].in_Offset_Scale = {+0.5, 0, 0, 0.45};
+
+    in_vertexData2[0].in_Rotation[0] = {1, 0, 0, 0};
+    in_vertexData2[0].in_Rotation[1] = {0, 1, 0, 0};
+    in_vertexData2[0].in_Rotation[2] = {0, 0, 1, 0};
+    in_vertexData2[0].in_Color = {1, 1, 1, 1};
+    in_vertexData2[0].in_Offset_Scale = {0, 0, 0, 0.75};
+
+    uint32_t pixel = 0x00ff0000;
+    uint32_t pixels[] = {pixel, pixel, pixel, pixel};
 
     Texture2D texture0 = textureManager.loadTexture("images/lion.tga");
     Texture2D texture1 = textureManager.loadTexture("images/lion_ddn.tga");
+    Texture2D texture2 = textureManager.loadTexture("images/stained_glass.tga");
+    Texture2D texture3 = device.createRGBATexture(2, 2, pixels);
 
     MaterialBumpedDiffuse bumpedDiffuse;
     bumpedDiffuse.program = program;
@@ -177,19 +199,48 @@ int main(int argc, char* argv[]) {
     bumpedDiffuse.bumpMap = texture1;
     bumpedDiffuse.bumpSampler = textureManager.getNearest();
     Material* material0 = Material::create(heapAllocator, &bumpedDiffuse);
-    Material* material1 = Material::create(heapAllocator, &bumpedDiffuse);
+
+    MaterialTransparency transparency;
+    transparency.program = programTransparent;
+    transparency.mainUnit = device.getUniformLocation(programTransparent, "in_MainTex");
+    transparency.mainTex = texture2;
+    transparency.mainSampler = textureManager.getLinear();
+    transparency.bumpUnit = device.getUniformLocation(programTransparent, "in_BumpMap");
+    transparency.bumpMap = texture1;
+    transparency.bumpSampler = textureManager.getNearest();
+    transparency.alpha = 0.5;
+    Material* material1 = Material::create(heapAllocator, &transparency);
+
+    MaterialBumpedDiffuse backgroundMaterial;
+    backgroundMaterial.program = program;
+    backgroundMaterial.mainUnit = device.getUniformLocation(program, "in_MainTex");
+    backgroundMaterial.mainTex = texture2;
+    backgroundMaterial.mainSampler = textureManager.getLinear();
+    backgroundMaterial.bumpUnit = device.getUniformLocation(program, "in_BumpMap");
+    backgroundMaterial.bumpMap = texture3;
+    backgroundMaterial.bumpSampler = textureManager.getNearest();
+    Material* material2 = Material::create(heapAllocator, &backgroundMaterial);
 
     device.setConstantBufferBindingPoint(program, "in_InstanceData", 0);
+    device.setConstantBufferBindingPoint(programTransparent, "in_InstanceData", 0);
+    device.setConstantBufferBindingPoint(programTransparent, "in_LightData", 1);
+
     ConstantBuffer constantBuffer0 = device.createConstantBuffer(4 * sizeof(In_vertexData));
-    ConstantBuffer constantBuffer1 = device.createConstantBuffer(1 * sizeof(In_vertexData));
+    ConstantBuffer constantBuffer1 = device.createConstantBuffer(2 * sizeof(In_vertexData));
+    ConstantBuffer constantBuffer2 = device.createConstantBuffer(1 * sizeof(In_vertexData));
 
     Model* model = modelManager.createSphere("sphere01", 1.0, 20);
 
     ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, in_vertexData0, 4 * sizeof(In_vertexData));
     ModelInstance::setMaterial(modelInstance0, 0, material0);
 
-    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 1, constantBuffer1, in_vertexData1, 1 * sizeof(In_vertexData));
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 2, constantBuffer1, in_vertexData1, 2 * sizeof(In_vertexData));
     ModelInstance::setMaterial(modelInstance1, 0, material1);
+
+    Model* quadModel = modelManager.createQuad("quad");
+
+    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, constantBuffer2, in_vertexData2, 1 * sizeof(In_vertexData));
+    ModelInstance::setMaterial(modelInstance2, 0, material2);
 
     modelManager.destroyModel(model);
 
@@ -204,12 +255,12 @@ int main(int argc, char* argv[]) {
     Texture2D position = device.createRGB32FTexture(wgbuffer, hgbuffer, nullptr);
     Texture2D normal = device.createRGB32FTexture(wgbuffer, hgbuffer, nullptr);
     Texture2D albedo = device.createRGBATexture(wgbuffer, hgbuffer, nullptr);
-    Renderbuffer depth = device.createRenderbuffer(wgbuffer, hgbuffer);
+    DepthStencilTexture depth = device.createDepthStencilTexture(wgbuffer, hgbuffer);
 
     device.bindTextureToFramebuffer(gBuffer, position, 0);
     device.bindTextureToFramebuffer(gBuffer, normal, 1);
     device.bindTextureToFramebuffer(gBuffer, albedo, 2);
-    device.bindRenderbufferToFramebuffer(gBuffer, depth);
+    device.bindDepthStencilTextureToFramebuffer(gBuffer, depth);
 
     if (!device.isFramebufferComplete(gBuffer))
         return -1;
@@ -217,47 +268,79 @@ int main(int argc, char* argv[]) {
     int targets[] = { 0, 1, 2 };
     device.setRenderTarget(gBuffer, targets, 3);
 
-    Program quadProgram = device.createProgram(quadVertexSource, quadFragmentSource, quadGeometrySource);
+    Framebuffer transparentBuffer = device.createFramebuffer();
+    Texture2D quadTexture = device.createRGBA32FTexture(wgbuffer, hgbuffer, nullptr);
+    device.bindTextureToFramebuffer(transparentBuffer, quadTexture, 0);
+    device.bindDepthStencilTextureToFramebuffer(transparentBuffer, depth);
+
+    if (!device.isFramebufferComplete(transparentBuffer))
+        return -1;
+
+    int quadTarget = 0;
+    device.setRenderTarget(transparentBuffer, &quadTarget, 1);
+
+    Program quadProgram = device.createProgram(commonSource, quadVertexSource, quadFragmentSource, quadGeometrySource);
+    Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
     CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 7);
     BindFramebuffer::create(setGBuffer, gBuffer);
     SetViewport::create(setGBuffer, &gBufferViewport);
-    ClearColor::create(setGBuffer, 0, 0.25, 0.25, 0.25, 1);
-    ClearColor::create(setGBuffer, 1, 0.25, 0.25, 0.25, 1);
-    ClearColor::create(setGBuffer, 2, 0.25, 0.25, 0.25, 1);
+    ClearColor::create(setGBuffer, 0, 0.00, 0.00, 0.00, 1); //position
+    ClearColor::create(setGBuffer, 1, 0.00, 0.00, 0.00, 1); //normal
+    ClearColor::create(setGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
     ClearDepthStencil::create(setGBuffer, 1.0, 0x00);
     SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
 
     device.setConstantBufferBindingPoint(quadProgram, "in_LightData", 0);
 
-    Vector4 lightPos[3] = {};
-    ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(sizeof(lightPos));
+    struct LightData {
+        Vector4 position;
+        Vector4 color;
+    };
+
+    LightData lightData[3] = {};
+    ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(LightData));
 
     Framebuffer nullFramebuffer = {0};
     CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 11);
-    BindFramebuffer::create(drawQuad, nullFramebuffer);
-    SetViewport::create(drawQuad, &viewport);
-    SetDepthTest::create(drawQuad, false, 0);
+    BindFramebuffer::create(drawQuad, transparentBuffer);
+    SetViewport::create(drawQuad, &gBufferViewport);
+    SetDepthTest::create(drawQuad, false, GL_NONE);
     BindProgram::create(drawQuad, quadProgram);
     BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
     BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
     BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
-    CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightPos, sizeof(lightPos));
+    CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightData, 3 * sizeof(LightData));
     BindConstantBuffer::create(drawQuad, lightPosConstantBuffer, 0);
+
+    CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
+    BindFramebuffer::create(drawTransparent, transparentBuffer);
+    SetViewport::create(drawTransparent, &gBufferViewport);
+    BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, 0);
 
     RenderQueue renderQueue(device, heapAllocator);
 
-    Model* quadModel = modelManager.createQuad("quad");
+    //deferred shading
+    ModelInstance::draw(modelInstance0, 1, renderQueue, setGBuffer);
+    ModelInstance::draw(modelInstance2, 2, renderQueue, setGBuffer);
 
-    ModelInstance::draw(modelInstance0, 2, renderQueue, setGBuffer);
-    ModelInstance::draw(modelInstance1, 1, renderQueue, setGBuffer);
+    //light accumulation
     Model::draw(quadModel, 3, renderQueue, drawQuad);
 
-    CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
+    //transparent materials
+    ModelInstance::draw(modelInstance1, 4, renderQueue, drawTransparent);
 
-    glEnable(GL_CULL_FACE); CHECK_ERROR;
-    glCullFace(GL_FRONT); CHECK_ERROR;
+    //todo change to glBlitFramebuffer?
+    CommandBuffer* copyCommand = CommandBuffer::create(heapAllocator, 10);
+    BindFramebuffer::create(copyCommand, nullFramebuffer);
+    SetDepthTest::create(copyCommand, false, GL_NONE);
+    SetViewport::create(copyCommand, &viewport);
+    BindProgram::create(copyCommand, copyProgram);
+    BindTexture::create(copyCommand, copyProgram, quadTexture, 0);
+    Model::draw(quadModel, 10, renderQueue, copyCommand);
+
+    CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
 
     double current = glfwGetTime();
     double inc = 0;
@@ -281,17 +364,20 @@ int main(int argc, char* argv[]) {
         float cos = cosf(angle);
         float sin = sinf(angle);
 
-        lightPos[0].x = sin * 2;
-        lightPos[0].y = 0;
-        lightPos[0].z = -1;
+        lightData[0].position.x = sin * 2;
+        lightData[0].position.y = 0;
+        lightData[0].position.z = -1;
+        lightData[0].color = {0.9, 0.6, 0.6, 1.0};
 
-        lightPos[1].x = 0;
-        lightPos[1].y = sin * 2;
-        lightPos[1].z = -1;
+        lightData[1].position.x = 0;
+        lightData[1].position.y = sin * 2;
+        lightData[1].position.z = -1;
+        lightData[1].color = {0.5, 0.9, 0.4, 1.0};
 
-        lightPos[2].x = cos * 2;
-        lightPos[2].y = sin * 2;
-        lightPos[2].z = -1;
+        lightData[2].position.x = cos * 2;
+        lightData[2].position.y = sin * 2;
+        lightData[2].position.z = -1;
+        lightData[2].color = {0.5, 0.4, 0.8, 1.0};
 
         angle += 0.005;
 
@@ -321,7 +407,8 @@ int main(int argc, char* argv[]) {
         rotateZ(in_vertexData0[2].in_Rotation);
         rotateX(in_vertexData0[3].in_Rotation);
 
-        rotateX(in_vertexData1[0].in_Rotation);
+        rotateY(in_vertexData1[0].in_Rotation);
+        rotateY(in_vertexData1[1].in_Rotation);
 
 //        in_vertexData0.in_Color[0].x -= 0.00001;
 //        in_vertexData0.in_Color[0].y -= 0.00002;
@@ -344,26 +431,37 @@ int main(int argc, char* argv[]) {
 
     Material::destroy(heapAllocator, material0);
     Material::destroy(heapAllocator, material1);
+    Material::destroy(heapAllocator, material2);
     CommandBuffer::destroy(heapAllocator, setGBuffer);
     CommandBuffer::destroy(heapAllocator, drawQuad);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
+    CommandBuffer::destroy(heapAllocator, drawTransparent);
+    CommandBuffer::destroy(heapAllocator, copyCommand);
 
     modelManager.destroyModel(quadModel);
     modelManager.destroyModelInstance(modelInstance0);
     modelManager.destroyModelInstance(modelInstance1);
+    modelManager.destroyModelInstance(modelInstance2);
     textureManager.unloadTexture(texture0);
     textureManager.unloadTexture(texture1);
+    textureManager.unloadTexture(texture2);
 
     device.destroyTexture(position);
     device.destroyTexture(normal);
     device.destroyTexture(albedo);
-    device.destoryRenderbuffer(depth);
+    device.destroyTexture(depth);
+    device.destroyTexture(quadTexture);
+    device.destroyTexture(texture3);
     device.destroyFramebuffer(gBuffer);
+    device.destroyFramebuffer(transparentBuffer);
     device.destroyConstantBuffer(lightPosConstantBuffer);
     device.destroyConstantBuffer(constantBuffer0);
     device.destroyConstantBuffer(constantBuffer1);
+    device.destroyConstantBuffer(constantBuffer2);
     device.destroyProgram(program);
+    device.destroyProgram(programTransparent);
     device.destroyProgram(quadProgram);
+    device.destroyProgram(copyProgram);
 
     heapAllocator.dumpFreeList();
 

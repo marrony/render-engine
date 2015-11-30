@@ -32,6 +32,8 @@ const char* fragmentFontSource = STR(
         }
 );
 
+const char* commonFontSource = "";
+
 #undef STR
 
 struct Font {
@@ -52,7 +54,7 @@ public:
 
         IndexBuffer indexBuffer = {0};
         vertexArray = device.createVertexArray(vertexDeclaration, 1, indexBuffer);
-        program = device.createProgram(vertexFontSource, fragmentFontSource);
+        program = device.createProgram(commonFontSource, vertexFontSource, fragmentFontSource);
     }
 
     ~TextManager() {
