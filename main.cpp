@@ -49,18 +49,8 @@ void check_error(const char* file, int line) {
 
 #define CHECK_ERROR check_error(__FILE__, __LINE__)
 
-struct Vector2 {
-    float x, y;
-};
-
-struct Vector3 {
-    float x, y, z;
-};
-
-struct Vector4 {
-    float x, y, z, w;
-};
-
+#include "Vector.h"
+#include "Matrix.h"
 #include "Allocator.h"
 #include "Device.h"
 #include "Commands.h"
@@ -140,47 +130,13 @@ int main(int argc, char* argv[]) {
     Program programTransparent = device.createProgram(commonSource, vertexTransparencySource, fragmentTransparencySource, nullptr);
 
     struct In_vertexData {
-        Vector4 in_Rotation[3];
+        float in_Rotation[16];
         Vector4 in_Color;
-        Vector4 in_Offset_Scale;
     };
 
     In_vertexData in_vertexData0[4];
     In_vertexData in_vertexData1[2];
     In_vertexData in_vertexData2[1];
-
-    Vector4 offsetScale[4] = {
-            -.0, -.0, 0, 0.35, //offset/scale
-            -.5, +.5, 0, 0.35,
-            +.5, +.5, 0, 0.35,
-            +.5, -.5, 0, 0.35,
-    };
-
-    for(int i = 0; i < 4; i++) {
-        in_vertexData0[i].in_Rotation[0] = {1, 0, 0, 0};
-        in_vertexData0[i].in_Rotation[1] = {0, 1, 0, 0};
-        in_vertexData0[i].in_Rotation[2] = {0, 0, 1, 0};
-        in_vertexData0[i].in_Color = {1, 1, 1, 1};
-        in_vertexData0[i].in_Offset_Scale = offsetScale[i];
-    }
-
-    in_vertexData1[0].in_Rotation[0] = {1, 0, 0, 0};
-    in_vertexData1[0].in_Rotation[1] = {0, 1, 0, 0};
-    in_vertexData1[0].in_Rotation[2] = {0, 0, 1, 0};
-    in_vertexData1[0].in_Color = {1, 1, 1, 1};
-    in_vertexData1[0].in_Offset_Scale = {-0.5, 0, 0, 0.45};
-
-    in_vertexData1[1].in_Rotation[0] = {1, 0, 0, 0};
-    in_vertexData1[1].in_Rotation[1] = {0, 1, 0, 0};
-    in_vertexData1[1].in_Rotation[2] = {0, 0, 1, 0};
-    in_vertexData1[1].in_Color = {1, 1, 1, 1};
-    in_vertexData1[1].in_Offset_Scale = {+0.5, 0, 0, 0.45};
-
-    in_vertexData2[0].in_Rotation[0] = {1, 0, 0, 0};
-    in_vertexData2[0].in_Rotation[1] = {0, 1, 0, 0};
-    in_vertexData2[0].in_Rotation[2] = {0, 0, 1, 0};
-    in_vertexData2[0].in_Color = {1, 1, 1, 1};
-    in_vertexData2[0].in_Offset_Scale = {0, 0, 0, 0.75};
 
     uint32_t pixel = 0x00ff0000;
     uint32_t pixels[] = {pixel, pixel, pixel, pixel};
@@ -342,6 +298,10 @@ int main(int argc, char* argv[]) {
 
     CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
 
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CW);
+
     double current = glfwGetTime();
     double inc = 0;
     int fps = 0;
@@ -367,52 +327,59 @@ int main(int argc, char* argv[]) {
         lightData[0].position.x = sin * 2;
         lightData[0].position.y = 0;
         lightData[0].position.z = -1;
-        lightData[0].color = {0.9, 0.6, 0.6, 1.0};
+        lightData[0].color = {0.9, 0.5, 0.4, 1.0};
 
         lightData[1].position.x = 0;
         lightData[1].position.y = sin * 2;
         lightData[1].position.z = -1;
-        lightData[1].color = {0.5, 0.9, 0.4, 1.0};
+        lightData[1].color = {0.2, 0.9, 0.4, 1.0};
 
         lightData[2].position.x = cos * 2;
         lightData[2].position.y = sin * 2;
         lightData[2].position.z = -1;
-        lightData[2].color = {0.5, 0.4, 0.8, 1.0};
+        lightData[2].color = {0.1, 0.2, 0.8, 1.0};
 
-        angle += 0.005;
+        float axisX[3] = {1, 0, 0};
+        float axisY[3] = {0, 1, 0};
+        float axisZ[3] = {0, 0, 1};
 
-        std::function<void(Vector4[])> rotateX = [cos, sin](Vector4 matrix[]) {
-            matrix[1].y = cos;
-            matrix[1].z = -sin;
-            matrix[2].y = sin;
-            matrix[2].z = cos;
+        float offset0[4][3] = {
+                -.0, -.0, 0,
+                -.5, +.5, 0,
+                +.5, +.5, 0,
+                +.5, -.5, 0,
         };
+        float scale0[3] = {0.35, 0.35, 0.35};
+        mnMatrix4Transformation(axisX, angle, offset0[0], scale0, in_vertexData0[0].in_Rotation);
+        mnMatrix4Transformation(axisY, angle, offset0[1], scale0, in_vertexData0[1].in_Rotation);
+        mnMatrix4Transformation(axisZ, angle, offset0[2], scale0, in_vertexData0[2].in_Rotation);
+        mnMatrix4Transformation(axisX, angle, offset0[3], scale0, in_vertexData0[3].in_Rotation);
 
-        std::function<void(Vector4[])> rotateY = [cos, sin](Vector4 matrix[]) {
-            matrix[0].x = cos;
-            matrix[0].z = sin;
-            matrix[2].x = -sin;
-            matrix[2].z = cos;
+        float offset1[2][3] = {
+                -0.5, 0, 0,
+                +0.5, 0, 0
         };
+        float scale1[3] = {0.45, 0.45, 0.45};
+        mnMatrix4Transformation(axisY, angle, offset1[0], scale1, in_vertexData1[0].in_Rotation);
+        mnMatrix4Transformation(axisY, angle, offset1[1], scale1, in_vertexData1[1].in_Rotation);
 
-        std::function<void(Vector4[])> rotateZ = [cos, sin](Vector4 matrix[]) {
-            matrix[0].x = cos;
-            matrix[0].y = -sin;
-            matrix[1].x = sin;
-            matrix[1].y = cos;
-        };
+        float offset2[3] = {0, 0, 0};
+        float scale2[3] = {0.75, 0.75, 0.75};
+        mnMatrix4Transformation(axisX, 0, offset2, scale2, in_vertexData2[0].in_Rotation);
 
-        rotateX(in_vertexData0[0].in_Rotation);
-        rotateY(in_vertexData0[1].in_Rotation);
-        rotateZ(in_vertexData0[2].in_Rotation);
-        rotateX(in_vertexData0[3].in_Rotation);
-
-        rotateY(in_vertexData1[0].in_Rotation);
-        rotateY(in_vertexData1[1].in_Rotation);
+        in_vertexData0[0].in_Color = {1, 1, 1, 1};
+        in_vertexData0[1].in_Color = {1, 1, 1, 1};
+        in_vertexData0[2].in_Color = {1, 1, 1, 1};
+        in_vertexData0[3].in_Color = {1, 1, 1, 1};
+        in_vertexData1[0].in_Color = {1, 1, 1, 1};
+        in_vertexData1[1].in_Color = {1, 1, 1, 1};
+        in_vertexData2[0].in_Color = {1, 1, 1, 1};
 
 //        in_vertexData0.in_Color[0].x -= 0.00001;
 //        in_vertexData0.in_Color[0].y -= 0.00002;
 //        in_vertexData0.in_Color[0].z -= 0.00003;
+
+        angle += 0.005;
 
         CommandBuffer::execute(commandBuffer, device);
 

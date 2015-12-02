@@ -83,7 +83,7 @@ public:
         size_t size = strlen(text);
 
         device.bindProgram(program);
-        device.setValue(program, "in_Color", 1, 0, 0);
+        device.setValue(program, "in_Color", 1, 0, 0); //TODO remove this call
         device.bindVertexArray(vertexArray);
 
         int width = 0;

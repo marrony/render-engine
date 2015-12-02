@@ -687,6 +687,7 @@ public:
         glBindTexture(GL_TEXTURE_2D, texture.id); CHECK_ERROR;
     }
 
+    //TODO remove this method
     void setValue(Program program, const char* name, float x, float y, float z) {
         int index = glGetUniformLocation(program.id, name);
         if (index != -1) {

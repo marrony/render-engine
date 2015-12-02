@@ -9,13 +9,12 @@
 
 const char* commonSource = STR(
 struct InstanceData {
-    mat3 in_Rotation;
+    mat4 in_Rotation;
     vec4 in_Color;
-    vec4 in_Offset_Scale;
 };
 
 struct VertexData {
-    vec3 position;
+    vec4 position;
     mat3 tbn;
     vec2 texture;
     vec4 color;
@@ -55,14 +54,12 @@ layout(std140) uniform in_InstanceData {
 out VertexData vtx;
 
 void main() {
-    vec3 offset = instanceData[gl_InstanceID].in_Offset_Scale.xyz;
-    float scale = instanceData[gl_InstanceID].in_Offset_Scale.w;
-    vtx.position = (instanceData[gl_InstanceID].in_Rotation * in_Position * scale) + offset;
-    gl_Position = vec4(vtx.position, 1);
+    vtx.position = instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    gl_Position = vtx.position;
     vtx.texture = in_Texture;
 
-    vec3 normal = normalize(instanceData[gl_InstanceID].in_Rotation * in_Normal);
-    vec3 tangent = normalize(instanceData[gl_InstanceID].in_Rotation * in_Tangent);
+    vec3 normal = normalize(mat3(instanceData[gl_InstanceID].in_Rotation) * in_Normal);
+    vec3 tangent = normalize(mat3(instanceData[gl_InstanceID].in_Rotation) * in_Tangent);
     vec3 bitangent = cross(tangent, normal);
 
     vtx.tbn = mat3(tangent, bitangent, normal);
@@ -121,7 +118,7 @@ layout(location = 2) out vec4 out_Albedo;
 void main() {
     vec3 normal = texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
 
-    out_Position = vtx.position;
+    out_Position = vtx.position.xyz;
     out_Normal = normalize(vtx.tbn * normal);
     out_Albedo.rgb = texture(in_MainTex, vtx.texture).rgb * vtx.color.rgb;
     out_Albedo.w = 1;
@@ -141,14 +138,12 @@ layout(std140) uniform in_InstanceData {
 out VertexData vtx;
 
 void main() {
-    vec3 offset = instanceData[gl_InstanceID].in_Offset_Scale.xyz;
-    float scale = instanceData[gl_InstanceID].in_Offset_Scale.w;
-    vtx.position = (instanceData[gl_InstanceID].in_Rotation * in_Position * scale) + offset;
-    gl_Position = vec4(vtx.position, 1);
+    vtx.position = instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    gl_Position = vtx.position;
     vtx.texture = in_Texture;
 
-    vec3 normal = normalize(instanceData[gl_InstanceID].in_Rotation * in_Normal);
-    vec3 tangent = normalize(instanceData[gl_InstanceID].in_Rotation * in_Tangent);
+    vec3 normal = normalize(mat3(instanceData[gl_InstanceID].in_Rotation) * in_Normal);
+    vec3 tangent = normalize(mat3(instanceData[gl_InstanceID].in_Rotation) * in_Tangent);
     vec3 bitangent = cross(tangent, normal);
 
     vtx.tbn = mat3(tangent, bitangent, normal);
@@ -176,16 +171,16 @@ void main() {
     vec3 normal = texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
     vec4 albedo = texture(in_MainTex, vtx.texture);
 
-    vec3 position = vtx.position;
+    vec3 position = vtx.position.xyz;
     normal = normalize(vtx.tbn * normal);
 
     float alpha = 0.5;
 
-    out_Color.rgb = vec3(0); //alpha * albedo.rgb * 0.2;
-    out_Color.rgb += alpha*calculateLight(position, normal, albedo, lightData[0]);
-    out_Color.rgb += alpha*calculateLight(position, normal, albedo, lightData[1]);
-    out_Color.rgb += alpha*calculateLight(position, normal, albedo, lightData[2]);
-    out_Color.a = alpha*alpha*alpha;
+    out_Color.rgb = alpha * albedo.rgb * 0.2;
+    out_Color.rgb += alpha * calculateLight(position, normal, albedo, lightData[0]);
+    out_Color.rgb += alpha * calculateLight(position, normal, albedo, lightData[1]);
+    out_Color.rgb += alpha * calculateLight(position, normal, albedo, lightData[2]);
+    out_Color.a = alpha;
 }
 );
 
