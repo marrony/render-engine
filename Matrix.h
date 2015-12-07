@@ -5,6 +5,12 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+//default opengl RIGHT_HANDED = 0 and ZERO_TO_ONE = 0
+//default dx RIGHT_HANDED = 1 and ZERO_TO_ONE = 1
+
+#define RIGHT_HANDED 0
+#define ZERO_TO_ONE 0
+
 //////////////////////////////////////////////////////////////////////////////
 
 void mnMatrix4Identity(float out[16]) {
@@ -147,12 +153,34 @@ void mnMatrix4MulVector2(const float mat[16], const float v[2], float out[2]) {
     out[1] = temp[1];
 }
 
+void mnVector2MulMatrix4(const float v[2], const float mat[16], float out[2]) {
+    float temp[2];
+
+    temp[0] = mnVector2Dot(v, mat + 0);
+    temp[1] = mnVector2Dot(v, mat + 4);
+
+    out[0] = temp[0];
+    out[1] = temp[1];
+}
+
 void mnMatrix4MulVector3(const float mat[16], const float v[3], float out[3]) {
     float temp[3] = {0, 0, 0};
 
     mnVector3MulAddScalar(mat + 0, v[0], temp);
     mnVector3MulAddScalar(mat + 4, v[1], temp);
     mnVector3MulAddScalar(mat + 8, v[2], temp);
+
+    out[0] = temp[0];
+    out[1] = temp[1];
+    out[2] = temp[2];
+}
+
+void mnVector3MulMatrix4(const float v[3], const float mat[16], float out[3]) {
+    float temp[3];
+
+    temp[0] = mnVector3Dot(v, mat + 0);
+    temp[1] = mnVector3Dot(v, mat + 4);
+    temp[2] = mnVector3Dot(v, mat + 8);
 
     out[0] = temp[0];
     out[1] = temp[1];
@@ -239,12 +267,6 @@ void mnMatrix4Frustum(float left, float right, float bottom, float top, float zn
 }
 
 //////////////////////////////////////////////////////////////////////////////
-
-//default opengl RIGHT_HANDED = 0 and ZERO_TO_ONE = 0
-//default dx RIGHT_HANDED = 1 and ZERO_TO_ONE = 1
-
-#define RIGHT_HANDED 0
-#define ZERO_TO_ONE 0
 
 void mnMatrix4Ortho(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
     float diffx = right - left;

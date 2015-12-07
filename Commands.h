@@ -14,6 +14,7 @@ enum CommandType {
     BIND_FRAMEBUFFER,
     SET_VIEWPORT,
     SET_DEPTH_TEST,
+    SET_CULL_FACE,
     SET_BLEND,
     CLEAR_COLOR0,
     CLEAR_COLOR1,
@@ -197,6 +198,32 @@ struct SetDepthTest {
             glDisable(GL_DEPTH_TEST);
 
 //            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        }
+    }
+};
+
+struct SetCullFace {
+    Command command;
+    bool enable;
+    int cullFace;
+    int frontFace;
+
+    static const uint32_t TYPE = SET_CULL_FACE;
+
+    static void create(CommandBuffer* commandBuffer, bool enable, int cullFace, int frontFace) {
+        SetCullFace* setCullFace = getCommand<SetCullFace>(commandBuffer);
+        setCullFace->enable = enable;
+        setCullFace->cullFace = cullFace;
+        setCullFace->frontFace = frontFace;
+    }
+
+    static void submit(Device& device, SetCullFace* cmd) {
+        if(cmd->enable) {
+            glEnable(GL_CULL_FACE);
+            glCullFace(cmd->cullFace);
+            glFrontFace(cmd->frontFace);
+        } else {
+            glDisable(GL_CULL_FACE);
         }
     }
 };
@@ -389,6 +416,7 @@ const FnSubmitCommand submitCommand[] = {
         [BIND_FRAMEBUFFER] = FnSubmitCommand(BindFramebuffer::submit),
         [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
         [SET_DEPTH_TEST] = FnSubmitCommand(SetDepthTest::submit),
+        [SET_CULL_FACE] = FnSubmitCommand(SetCullFace::submit),
         [SET_BLEND] = FnSubmitCommand(SetBlend::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
         [BIND_CONSTANT_BUFFER] = FnSubmitCommand(BindConstantBuffer::submit),
@@ -410,6 +438,7 @@ const int sizeCommand[] = {
         [BIND_FRAMEBUFFER] = sizeof(BindFramebuffer),
         [SET_VIEWPORT] = sizeof(SetViewport),
         [SET_DEPTH_TEST] = sizeof(SetDepthTest),
+        [SET_CULL_FACE] = sizeof(SetCullFace),
         [SET_BLEND] = sizeof(SetBlend),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
         [BIND_CONSTANT_BUFFER] = sizeof(BindConstantBuffer),

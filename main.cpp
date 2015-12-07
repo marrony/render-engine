@@ -129,8 +129,8 @@ int main(int argc, char* argv[]) {
     Program programOpaque = device.createProgram(commonSource, vertexSource, fragmentSource, nullptr);
     Program programTransparent = device.createProgram(commonSource, vertexTransparencySource, fragmentTransparencySource, nullptr);
 
-    struct In_VertexData {
-        float in_Rotation[16];
+    struct In_InstanceData {
+        Matrix4 in_Rotation;
         Vector4 in_Color;
     };
 
@@ -139,10 +139,16 @@ int main(int argc, char* argv[]) {
         Matrix4 view;
     };
 
+    struct In_LightData {
+        Vector4 position;
+        Vector4 color;
+    };
+
     In_FrameData in_frameData;
-    In_VertexData in_vertexData0[4];
-    In_VertexData in_vertexData1[2];
-    In_VertexData in_vertexData2[1];
+    In_InstanceData in_sphere4Instances[4];
+    In_InstanceData in_sphere2Instances[2];
+    In_InstanceData in_plane1Instance[1];
+    In_InstanceData in_planeTranspInstance[1];
 
     uint32_t pixel = 0x00ff0000;
     uint32_t pixels[] = {pixel, pixel, pixel, pixel};
@@ -160,7 +166,7 @@ int main(int argc, char* argv[]) {
     bumpedDiffuse.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
     bumpedDiffuse.bumpMap = texture1;
     bumpedDiffuse.bumpSampler = textureManager.getNearest();
-    Material* material0 = Material::create(heapAllocator, &bumpedDiffuse);
+    Material* diffuseMaterial = Material::create(heapAllocator, &bumpedDiffuse);
 
     MaterialTransparency transparency;
     transparency.program = programTransparent;
@@ -168,21 +174,20 @@ int main(int argc, char* argv[]) {
     transparency.mainTex = texture2;
     transparency.mainSampler = textureManager.getLinear();
     transparency.bumpUnit = device.getUniformLocation(programTransparent, "in_BumpMap");
-    transparency.bumpMap = texture1;
+    transparency.bumpMap = texture3;
     transparency.bumpSampler = textureManager.getNearest();
     transparency.alpha = 0.5;
-    //transparency.bindPoint = 2;
-    Material* material1 = Material::create(heapAllocator, &transparency);
+    Material* transparentMaterial = Material::create(heapAllocator, &transparency);
 
-    MaterialBumpedDiffuse backgroundMaterial;
-    backgroundMaterial.program = programOpaque;
-    backgroundMaterial.mainUnit = device.getUniformLocation(programOpaque, "in_MainTex");
-    backgroundMaterial.mainTex = texture2;
-    backgroundMaterial.mainSampler = textureManager.getLinear();
-    backgroundMaterial.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
-    backgroundMaterial.bumpMap = texture3;
-    backgroundMaterial.bumpSampler = textureManager.getNearest();
-    Material* material2 = Material::create(heapAllocator, &backgroundMaterial);
+    MaterialBumpedDiffuse bumpedDiffuse2;
+    bumpedDiffuse2.program = programOpaque;
+    bumpedDiffuse2.mainUnit = device.getUniformLocation(programOpaque, "in_MainTex");
+    bumpedDiffuse2.mainTex = texture2;
+    bumpedDiffuse2.mainSampler = textureManager.getLinear();
+    bumpedDiffuse2.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
+    bumpedDiffuse2.bumpMap = texture3;
+    bumpedDiffuse2.bumpSampler = textureManager.getNearest();
+    Material* backgroundMaterial = Material::create(heapAllocator, &bumpedDiffuse2);
 
     int BINDING_POINT_INSTANCE_DATA = 0;
     int BINDING_POINT_FRAME_DATA = 1;
@@ -194,25 +199,29 @@ int main(int argc, char* argv[]) {
     device.setConstantBufferBindingPoint(programTransparent, "in_FrameData", BINDING_POINT_FRAME_DATA);
     device.setConstantBufferBindingPoint(programTransparent, "in_LightData", BINDING_POINT_LIGHT_DATA);
 
-    ConstantBuffer constantBuffer0 = device.createConstantBuffer(4 * sizeof(In_VertexData));
-    ConstantBuffer constantBuffer1 = device.createConstantBuffer(2 * sizeof(In_VertexData));
-    ConstantBuffer constantBuffer2 = device.createConstantBuffer(1 * sizeof(In_VertexData));
+    ConstantBuffer sphere4Instances = device.createConstantBuffer(4 * sizeof(In_InstanceData));
+    ConstantBuffer sphere2Instances = device.createConstantBuffer(2 * sizeof(In_InstanceData));
+    ConstantBuffer plane1Instance = device.createConstantBuffer(1 * sizeof(In_InstanceData));
+    ConstantBuffer planeTranspInstance = device.createConstantBuffer(1 * sizeof(In_InstanceData));
     ConstantBuffer frameDataBuffer = device.createConstantBuffer(sizeof(In_FrameData));
 
-    Model* model = modelManager.createSphere("sphere01", 1.0, 20);
+    Model* sphereModel = modelManager.createSphere("sphere01", 1.0, 20);
 
-    ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, in_vertexData0, 4 * sizeof(In_VertexData));
-    ModelInstance::setMaterial(modelInstance0, 0, material0);
+    ModelInstance* modelInstance0 = modelManager.createModelInstance(sphereModel, 4, sphere4Instances, in_sphere4Instances, 4 * sizeof(In_InstanceData));
+    ModelInstance::setMaterial(modelInstance0, 0, diffuseMaterial);
 
-    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 2, constantBuffer1, in_vertexData1, 2 * sizeof(In_VertexData));
-    ModelInstance::setMaterial(modelInstance1, 0, material1);
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(sphereModel, 2, sphere2Instances, in_sphere2Instances, 2 * sizeof(In_InstanceData));
+    ModelInstance::setMaterial(modelInstance1, 0, transparentMaterial);
 
     Model* quadModel = modelManager.createQuad("quad");
 
-    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, constantBuffer2, in_vertexData2, 1 * sizeof(In_VertexData));
-    ModelInstance::setMaterial(modelInstance2, 0, material2);
+    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, plane1Instance, in_plane1Instance, 1 * sizeof(In_InstanceData));
+    ModelInstance::setMaterial(modelInstance2, 0, backgroundMaterial);
 
-    modelManager.destroyModel(model);
+    ModelInstance* modelInstance3 = modelManager.createModelInstance(quadModel, 1, planeTranspInstance, in_planeTranspInstance, 1 * sizeof(In_InstanceData));
+    ModelInstance::setMaterial(modelInstance3, 0, transparentMaterial);
+
+    modelManager.destroyModel(sphereModel);
 
     viewport.x = 0;
     viewport.y = 0;
@@ -261,29 +270,26 @@ int main(int argc, char* argv[]) {
     ClearColor::create(setGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
     ClearDepthStencil::create(setGBuffer, 1.0, 0x00);
     SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
+    SetCullFace::create(setGBuffer, true, GL_BACK, GL_CW);
     CopyConstantBuffer::create(setGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(setGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     device.setConstantBufferBindingPoint(quadProgram, "in_LightData", BINDING_POINT_LIGHT_DATA);
 
-    struct LightData {
-        Vector4 position;
-        Vector4 color;
-    };
-
-    LightData lightData[3] = {};
-    ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(LightData));
+    In_LightData lightData[3] = {};
+    ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(In_LightData));
 
     Framebuffer nullFramebuffer = {0};
     CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 20);
     BindFramebuffer::create(drawQuad, transparentBuffer);
     SetViewport::create(drawQuad, &gBufferViewport);
     SetDepthTest::create(drawQuad, false, GL_NONE);
+    SetCullFace::create(drawQuad, true, GL_BACK, GL_CW);
     BindProgram::create(drawQuad, quadProgram);
     BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
     BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
     BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
-    CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightData, 3 * sizeof(LightData));
+    CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
     BindConstantBuffer::create(drawQuad, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
     CopyConstantBuffer::create(drawQuad, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(drawQuad, frameDataBuffer, BINDING_POINT_FRAME_DATA);
@@ -291,7 +297,8 @@ int main(int argc, char* argv[]) {
     CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(drawTransparent, transparentBuffer);
     SetViewport::create(drawTransparent, &gBufferViewport);
-    SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
+    SetDepthTest::create(drawTransparent, true, GL_LEQUAL);
+    SetCullFace::create(drawTransparent, false, GL_NONE, GL_NONE);
     BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
     CopyConstantBuffer::create(drawTransparent, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(drawTransparent, frameDataBuffer, BINDING_POINT_FRAME_DATA);
@@ -307,21 +314,19 @@ int main(int argc, char* argv[]) {
 
     //transparent materials
     ModelInstance::draw(modelInstance1, 4, renderQueue, drawTransparent);
+    ModelInstance::draw(modelInstance3, 5, renderQueue, drawTransparent);
 
     //todo change to glBlitFramebuffer?
     CommandBuffer* copyCommand = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(copyCommand, nullFramebuffer);
     SetDepthTest::create(copyCommand, false, GL_NONE);
+    SetCullFace::create(copyCommand, true, GL_BACK, GL_CW);
     SetViewport::create(copyCommand, &viewport);
     BindProgram::create(copyCommand, copyProgram);
     BindTexture::create(copyCommand, copyProgram, quadTexture, 0);
     Model::draw(quadModel, 10, renderQueue, copyCommand);
 
     CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
-
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CW);
 
     double current = glfwGetTime();
     double inc = 0;
@@ -382,30 +387,34 @@ int main(int argc, char* argv[]) {
                 +.5, -.5, 0,
         };
         float scale0[3] = {0.35, 0.35, 0.35};
-        mnMatrix4Transformation(axisX, angle, offset0[0], scale0, in_vertexData0[0].in_Rotation);
-        mnMatrix4Transformation(axisY, angle, offset0[1], scale0, in_vertexData0[1].in_Rotation);
-        mnMatrix4Transformation(axisZ, angle, offset0[2], scale0, in_vertexData0[2].in_Rotation);
-        mnMatrix4Transformation(axisX, angle, offset0[3], scale0, in_vertexData0[3].in_Rotation);
+        mnMatrix4Transformation(axisX, angle, offset0[0], scale0, in_sphere4Instances[0].in_Rotation.values);
+        mnMatrix4Transformation(axisY, angle, offset0[1], scale0, in_sphere4Instances[1].in_Rotation.values);
+        mnMatrix4Transformation(axisZ, angle, offset0[2], scale0, in_sphere4Instances[2].in_Rotation.values);
+        mnMatrix4Transformation(axisX, angle, offset0[3], scale0, in_sphere4Instances[3].in_Rotation.values);
 
         float offset1[2][3] = {
                 -0.5, 0, 0,
                 +0.5, 0, 0
         };
         float scale1[3] = {0.45, 0.45, 0.45};
-        mnMatrix4Transformation(axisY, angle, offset1[0], scale1, in_vertexData1[0].in_Rotation);
-        mnMatrix4Transformation(axisY, angle, offset1[1], scale1, in_vertexData1[1].in_Rotation);
+        mnMatrix4Transformation(axisY, angle, offset1[0], scale1, in_sphere2Instances[0].in_Rotation.values);
+        mnMatrix4Transformation(axisY, angle, offset1[1], scale1, in_sphere2Instances[1].in_Rotation.values);
 
         float offset2[3] = {0, 0, 0};
         float scale2[3] = {0.75, 0.75, 0.75};
-        mnMatrix4Transformation(axisX, 0, offset2, scale2, in_vertexData2[0].in_Rotation);
+        mnMatrix4Transformation(axisX, 0, offset2, scale2, in_plane1Instance[0].in_Rotation.values);
 
-        in_vertexData0[0].in_Color = {1, 1, 1, 1};
-        in_vertexData0[1].in_Color = {1, 1, 1, 1};
-        in_vertexData0[2].in_Color = {1, 1, 1, 1};
-        in_vertexData0[3].in_Color = {1, 1, 1, 1};
-        in_vertexData1[0].in_Color = {1, 1, 1, 1};
-        in_vertexData1[1].in_Color = {1, 1, 1, 1};
-        in_vertexData2[0].in_Color = {1, 1, 1, 1};
+        float offset3[3] = {0, 0, -0.5};
+        float scale3[3] = {0.5, 0.5, 0.5};
+        mnMatrix4Transformation(axisX, 0, offset3, scale3, in_planeTranspInstance[0].in_Rotation.values);
+
+        in_sphere4Instances[0].in_Color = {1, 1, 1, 1};
+        in_sphere4Instances[1].in_Color = {1, 1, 1, 1};
+        in_sphere4Instances[2].in_Color = {1, 1, 1, 1};
+        in_sphere4Instances[3].in_Color = {1, 1, 1, 1};
+        in_sphere2Instances[0].in_Color = {1, 1, 1, 1};
+        in_sphere2Instances[1].in_Color = {1, 1, 1, 1};
+        in_plane1Instance[0].in_Color = {1, 1, 1, 1};
 
 //        in_vertexData0.in_Color[0].x -= 0.00001;
 //        in_vertexData0.in_Color[0].y -= 0.00002;
@@ -428,9 +437,9 @@ int main(int argc, char* argv[]) {
         glfwPollEvents();
     }
 
-    Material::destroy(heapAllocator, material0);
-    Material::destroy(heapAllocator, material1);
-    Material::destroy(heapAllocator, material2);
+    Material::destroy(heapAllocator, diffuseMaterial);
+    Material::destroy(heapAllocator, transparentMaterial);
+    Material::destroy(heapAllocator, backgroundMaterial);
     CommandBuffer::destroy(heapAllocator, setGBuffer);
     CommandBuffer::destroy(heapAllocator, drawQuad);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
@@ -441,6 +450,7 @@ int main(int argc, char* argv[]) {
     modelManager.destroyModelInstance(modelInstance0);
     modelManager.destroyModelInstance(modelInstance1);
     modelManager.destroyModelInstance(modelInstance2);
+    modelManager.destroyModelInstance(modelInstance3);
     textureManager.unloadTexture(texture0);
     textureManager.unloadTexture(texture1);
     textureManager.unloadTexture(texture2);
@@ -454,9 +464,10 @@ int main(int argc, char* argv[]) {
     device.destroyFramebuffer(gBuffer);
     device.destroyFramebuffer(transparentBuffer);
     device.destroyConstantBuffer(lightPosConstantBuffer);
-    device.destroyConstantBuffer(constantBuffer0);
-    device.destroyConstantBuffer(constantBuffer1);
-    device.destroyConstantBuffer(constantBuffer2);
+    device.destroyConstantBuffer(sphere4Instances);
+    device.destroyConstantBuffer(sphere2Instances);
+    device.destroyConstantBuffer(plane1Instance);
+    device.destroyConstantBuffer(planeTranspInstance);
     device.destroyConstantBuffer(frameDataBuffer);
     device.destroyProgram(programOpaque);
     device.destroyProgram(programTransparent);
