@@ -47,6 +47,11 @@ layout(location = 1) in vec2 in_Texture;
 layout(location = 2) in vec3 in_Normal;
 layout(location = 3) in vec3 in_Tangent;
 
+layout(std140) uniform in_FrameData {
+    mat4 projection;
+    mat4 view;
+};
+
 layout(std140) uniform in_InstanceData {
     InstanceData instanceData[4];
 };
@@ -54,7 +59,8 @@ layout(std140) uniform in_InstanceData {
 out VertexData vtx;
 
 void main() {
-    vtx.position = instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    vtx.position = projection * view * (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1));
+    //vtx.position = (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1)) * view * projection;
     gl_Position = vtx.position;
     vtx.texture = in_Texture;
 
@@ -131,6 +137,11 @@ layout(location = 1) in vec2 in_Texture;
 layout(location = 2) in vec3 in_Normal;
 layout(location = 3) in vec3 in_Tangent;
 
+layout(std140) uniform in_FrameData {
+    mat4 projection;
+    mat4 view;
+};
+
 layout(std140) uniform in_InstanceData {
     InstanceData instanceData[4];
 };
@@ -138,7 +149,8 @@ layout(std140) uniform in_InstanceData {
 out VertexData vtx;
 
 void main() {
-    vtx.position = instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    vtx.position = projection * view * (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1));
+    //vtx.position = (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1)) * view * projection;
     gl_Position = vtx.position;
     vtx.texture = in_Texture;
 

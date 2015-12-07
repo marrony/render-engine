@@ -126,17 +126,23 @@ int main(int argc, char* argv[]) {
     //SeparateProgram vertexProgram = device.createVertexProgram(commonSource, vertexSource);
     //SeparateProgram fragmentProgram = device.createFragmentProgram(commonSource, fragmentSource);
 
-    Program program = device.createProgram(commonSource, vertexSource, fragmentSource, nullptr);
+    Program programOpaque = device.createProgram(commonSource, vertexSource, fragmentSource, nullptr);
     Program programTransparent = device.createProgram(commonSource, vertexTransparencySource, fragmentTransparencySource, nullptr);
 
-    struct In_vertexData {
+    struct In_VertexData {
         float in_Rotation[16];
         Vector4 in_Color;
     };
 
-    In_vertexData in_vertexData0[4];
-    In_vertexData in_vertexData1[2];
-    In_vertexData in_vertexData2[1];
+    struct In_FrameData {
+        Matrix4 projection;
+        Matrix4 view;
+    };
+
+    In_FrameData in_frameData;
+    In_VertexData in_vertexData0[4];
+    In_VertexData in_vertexData1[2];
+    In_VertexData in_vertexData2[1];
 
     uint32_t pixel = 0x00ff0000;
     uint32_t pixels[] = {pixel, pixel, pixel, pixel};
@@ -147,11 +153,11 @@ int main(int argc, char* argv[]) {
     Texture2D texture3 = device.createRGBATexture(2, 2, pixels);
 
     MaterialBumpedDiffuse bumpedDiffuse;
-    bumpedDiffuse.program = program;
-    bumpedDiffuse.mainUnit = device.getUniformLocation(program, "in_MainTex");
+    bumpedDiffuse.program = programOpaque;
+    bumpedDiffuse.mainUnit = device.getUniformLocation(programOpaque, "in_MainTex");
     bumpedDiffuse.mainTex = texture0;
     bumpedDiffuse.mainSampler = textureManager.getLinear();
-    bumpedDiffuse.bumpUnit = device.getUniformLocation(program, "in_BumpMap");
+    bumpedDiffuse.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
     bumpedDiffuse.bumpMap = texture1;
     bumpedDiffuse.bumpSampler = textureManager.getNearest();
     Material* material0 = Material::create(heapAllocator, &bumpedDiffuse);
@@ -165,37 +171,45 @@ int main(int argc, char* argv[]) {
     transparency.bumpMap = texture1;
     transparency.bumpSampler = textureManager.getNearest();
     transparency.alpha = 0.5;
+    //transparency.bindPoint = 2;
     Material* material1 = Material::create(heapAllocator, &transparency);
 
     MaterialBumpedDiffuse backgroundMaterial;
-    backgroundMaterial.program = program;
-    backgroundMaterial.mainUnit = device.getUniformLocation(program, "in_MainTex");
+    backgroundMaterial.program = programOpaque;
+    backgroundMaterial.mainUnit = device.getUniformLocation(programOpaque, "in_MainTex");
     backgroundMaterial.mainTex = texture2;
     backgroundMaterial.mainSampler = textureManager.getLinear();
-    backgroundMaterial.bumpUnit = device.getUniformLocation(program, "in_BumpMap");
+    backgroundMaterial.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
     backgroundMaterial.bumpMap = texture3;
     backgroundMaterial.bumpSampler = textureManager.getNearest();
     Material* material2 = Material::create(heapAllocator, &backgroundMaterial);
 
-    device.setConstantBufferBindingPoint(program, "in_InstanceData", 0);
-    device.setConstantBufferBindingPoint(programTransparent, "in_InstanceData", 0);
-    device.setConstantBufferBindingPoint(programTransparent, "in_LightData", 1);
+    int BINDING_POINT_INSTANCE_DATA = 0;
+    int BINDING_POINT_FRAME_DATA = 1;
+    int BINDING_POINT_LIGHT_DATA = 2;
 
-    ConstantBuffer constantBuffer0 = device.createConstantBuffer(4 * sizeof(In_vertexData));
-    ConstantBuffer constantBuffer1 = device.createConstantBuffer(2 * sizeof(In_vertexData));
-    ConstantBuffer constantBuffer2 = device.createConstantBuffer(1 * sizeof(In_vertexData));
+    device.setConstantBufferBindingPoint(programOpaque, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
+    device.setConstantBufferBindingPoint(programOpaque, "in_FrameData", BINDING_POINT_FRAME_DATA);
+    device.setConstantBufferBindingPoint(programTransparent, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
+    device.setConstantBufferBindingPoint(programTransparent, "in_FrameData", BINDING_POINT_FRAME_DATA);
+    device.setConstantBufferBindingPoint(programTransparent, "in_LightData", BINDING_POINT_LIGHT_DATA);
+
+    ConstantBuffer constantBuffer0 = device.createConstantBuffer(4 * sizeof(In_VertexData));
+    ConstantBuffer constantBuffer1 = device.createConstantBuffer(2 * sizeof(In_VertexData));
+    ConstantBuffer constantBuffer2 = device.createConstantBuffer(1 * sizeof(In_VertexData));
+    ConstantBuffer frameDataBuffer = device.createConstantBuffer(sizeof(In_FrameData));
 
     Model* model = modelManager.createSphere("sphere01", 1.0, 20);
 
-    ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, in_vertexData0, 4 * sizeof(In_vertexData));
+    ModelInstance* modelInstance0 = modelManager.createModelInstance(model, 4, constantBuffer0, in_vertexData0, 4 * sizeof(In_VertexData));
     ModelInstance::setMaterial(modelInstance0, 0, material0);
 
-    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 2, constantBuffer1, in_vertexData1, 2 * sizeof(In_vertexData));
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(model, 2, constantBuffer1, in_vertexData1, 2 * sizeof(In_VertexData));
     ModelInstance::setMaterial(modelInstance1, 0, material1);
 
     Model* quadModel = modelManager.createQuad("quad");
 
-    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, constantBuffer2, in_vertexData2, 1 * sizeof(In_vertexData));
+    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, constantBuffer2, in_vertexData2, 1 * sizeof(In_VertexData));
     ModelInstance::setMaterial(modelInstance2, 0, material2);
 
     modelManager.destroyModel(model);
@@ -239,7 +253,7 @@ int main(int argc, char* argv[]) {
     Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 7);
+    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(setGBuffer, gBuffer);
     SetViewport::create(setGBuffer, &gBufferViewport);
     ClearColor::create(setGBuffer, 0, 0.00, 0.00, 0.00, 1); //position
@@ -247,8 +261,10 @@ int main(int argc, char* argv[]) {
     ClearColor::create(setGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
     ClearDepthStencil::create(setGBuffer, 1.0, 0x00);
     SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
+    CopyConstantBuffer::create(setGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+    BindConstantBuffer::create(setGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
-    device.setConstantBufferBindingPoint(quadProgram, "in_LightData", 0);
+    device.setConstantBufferBindingPoint(quadProgram, "in_LightData", BINDING_POINT_LIGHT_DATA);
 
     struct LightData {
         Vector4 position;
@@ -259,7 +275,7 @@ int main(int argc, char* argv[]) {
     ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(LightData));
 
     Framebuffer nullFramebuffer = {0};
-    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 11);
+    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 20);
     BindFramebuffer::create(drawQuad, transparentBuffer);
     SetViewport::create(drawQuad, &gBufferViewport);
     SetDepthTest::create(drawQuad, false, GL_NONE);
@@ -268,12 +284,17 @@ int main(int argc, char* argv[]) {
     BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
     BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
     CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightData, 3 * sizeof(LightData));
-    BindConstantBuffer::create(drawQuad, lightPosConstantBuffer, 0);
+    BindConstantBuffer::create(drawQuad, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
+    CopyConstantBuffer::create(drawQuad, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+    BindConstantBuffer::create(drawQuad, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(drawTransparent, transparentBuffer);
     SetViewport::create(drawTransparent, &gBufferViewport);
-    BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, 0);
+    SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
+    BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
+    CopyConstantBuffer::create(drawTransparent, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+    BindConstantBuffer::create(drawTransparent, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     RenderQueue renderQueue(device, heapAllocator);
 
@@ -338,6 +359,17 @@ int main(int argc, char* argv[]) {
         lightData[2].position.y = sin * 2;
         lightData[2].position.z = -1;
         lightData[2].color = {0.1, 0.2, 0.8, 1.0};
+
+        mnMatrix4Identity(in_frameData.projection.values);
+        mnMatrix4Identity(in_frameData.view.values);
+
+        float fov = 45.0f * M_PI / 180.0f;
+        mnMatrix4Perspective(fov, viewport.width / (float)viewport.height, 0.001, 10, in_frameData.projection.values);
+//        mnMatrix4Ortho(-1, +1, -1, +1, -10, +10, in_frameData.projection.values);
+
+        float eye[3] = {sinf(angle)*2.5f, 0, cosf(angle)*2.5f};
+        float center[3] = {0, 0, 0};
+        mnMatrix4LookAt(eye, center, in_frameData.view.values);
 
         float axisX[3] = {1, 0, 0};
         float axisY[3] = {0, 1, 0};
@@ -425,7 +457,8 @@ int main(int argc, char* argv[]) {
     device.destroyConstantBuffer(constantBuffer0);
     device.destroyConstantBuffer(constantBuffer1);
     device.destroyConstantBuffer(constantBuffer2);
-    device.destroyProgram(program);
+    device.destroyConstantBuffer(frameDataBuffer);
+    device.destroyProgram(programOpaque);
     device.destroyProgram(programTransparent);
     device.destroyProgram(quadProgram);
     device.destroyProgram(copyProgram);

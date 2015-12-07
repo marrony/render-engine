@@ -34,6 +34,7 @@ struct Material {
 
         material->state = CommandBuffer::create(allocator, 10);
         BindProgram::create(material->state, diffuse->program);
+        SetDepthTest::create(material->state, true, GL_LEQUAL);
         SetBlend::create(material->state, false, 0, GL_NONE, GL_NONE, GL_NONE);
         SetBlend::create(material->state, false, 1, GL_NONE, GL_NONE, GL_NONE);
         SetBlend::create(material->state, false, 2, GL_NONE, GL_NONE, GL_NONE);
