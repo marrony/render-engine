@@ -10,7 +10,9 @@ pkg_search_module(FREETYPE REQUIRED freetype2)
 
 find_library(FOUNDATION_LIBRARY Foundation)
 
-include_directories(${CMAKE_OSX_SYSROOT}/usr/include)
+find_path(STDIO_INCLUDE_PATH stdio.h)
+
+include_directories("${STDIO_INCLUDE_PATH}/dummy/../")
 include_directories(".")
 include_directories("gl3w/include")
 

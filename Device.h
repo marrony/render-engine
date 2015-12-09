@@ -13,8 +13,13 @@ struct Texture2D {
     GLuint id;
 };
 
-struct DepthStencilTexture {
+struct TextureCube {
     GLuint id;
+};
+
+union DepthStencilTexture {
+    GLuint id;
+    Texture2D texture;
 };
 
 struct VertexBuffer {
@@ -534,7 +539,7 @@ public:
     }
 
     void destroyTexture(DepthStencilTexture texture) {
-        if (texture.id == 0) return;
+        if (texture.texture.id == 0) return;
 
         glDeleteTextures(1, &texture.id);
 

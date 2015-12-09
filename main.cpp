@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
+#include <assert.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -63,6 +64,8 @@ void check_error(const char* file, int line) {
 
 Viewport viewport = {};
 
+bool perspective = true;
+
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
@@ -78,6 +81,9 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
     if (key == GLFW_KEY_LEFT /*&& action == GLFW_PRESS*/)
         viewport.width--;
+
+    if (key == GLFW_KEY_P && action == GLFW_RELEASE)
+        perspective = !perspective;
 }
 
 void framebuffer_callback(GLFWwindow* window, int width, int height) {
@@ -262,17 +268,24 @@ int main(int argc, char* argv[]) {
     Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
 
     Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* setGBuffer = CommandBuffer::create(heapAllocator, 10);
-    BindFramebuffer::create(setGBuffer, gBuffer);
-    SetViewport::create(setGBuffer, &gBufferViewport);
-    ClearColor::create(setGBuffer, 0, 0.00, 0.00, 0.00, 1); //position
-    ClearColor::create(setGBuffer, 1, 0.00, 0.00, 0.00, 1); //normal
-    ClearColor::create(setGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
-    ClearDepthStencil::create(setGBuffer, 1.0, 0x00);
-    SetDepthTest::create(setGBuffer, true, GL_LEQUAL);
-    SetCullFace::create(setGBuffer, true, GL_BACK, GL_CW);
-    CopyConstantBuffer::create(setGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
-    BindConstantBuffer::create(setGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
+    CommandBuffer* drawGBuffer = CommandBuffer::create(heapAllocator, 10);
+    BindFramebuffer::create(drawGBuffer, gBuffer);
+    SetViewport::create(drawGBuffer, &gBufferViewport);
+    ClearColor::create(drawGBuffer, 0, 0.00, 0.00, 0.00, 1); //position
+    ClearColor::create(drawGBuffer, 1, 0.00, 0.00, 0.00, 1); //normal
+    ClearColor::create(drawGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
+#if RIGHT_HANDED
+    ClearDepthStencil::create(drawGBuffer, 1.0, 0x00);
+    SetDepthTest::create(drawGBuffer, true, GL_LEQUAL);
+    SetCullFace::create(drawGBuffer, true, GL_BACK, GL_CCW);
+#else
+    ClearDepthStencil::create(drawGBuffer, 0.0, 0x00);
+    SetDepthTest::create(drawGBuffer, true, GL_GEQUAL);
+    SetCullFace::create(drawGBuffer, true, GL_BACK, GL_CW);
+    glDepthRange(1, 0);
+#endif
+    CopyConstantBuffer::create(drawGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+    BindConstantBuffer::create(drawGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     device.setConstantBufferBindingPoint(quadProgram, "in_LightData", BINDING_POINT_LIGHT_DATA);
 
@@ -280,25 +293,29 @@ int main(int argc, char* argv[]) {
     ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(In_LightData));
 
     Framebuffer nullFramebuffer = {0};
-    CommandBuffer* drawQuad = CommandBuffer::create(heapAllocator, 20);
-    BindFramebuffer::create(drawQuad, transparentBuffer);
-    SetViewport::create(drawQuad, &gBufferViewport);
-    SetDepthTest::create(drawQuad, false, GL_NONE);
-    SetCullFace::create(drawQuad, true, GL_BACK, GL_CW);
-    BindProgram::create(drawQuad, quadProgram);
-    BindTexture::create(drawQuad, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
-    BindTexture::create(drawQuad, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
-    BindTexture::create(drawQuad, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
-    CopyConstantBuffer::create(drawQuad, lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
-    BindConstantBuffer::create(drawQuad, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
-    CopyConstantBuffer::create(drawQuad, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
-    BindConstantBuffer::create(drawQuad, frameDataBuffer, BINDING_POINT_FRAME_DATA);
+    CommandBuffer* drawQuadLight = CommandBuffer::create(heapAllocator, 20);
+    BindFramebuffer::create(drawQuadLight, transparentBuffer);
+    SetViewport::create(drawQuadLight, &gBufferViewport);
+    SetDepthTest::disable(drawQuadLight);
+    SetCullFace::disable(drawQuadLight);
+    BindProgram::create(drawQuadLight, quadProgram);
+    BindTexture::create(drawQuadLight, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
+    BindTexture::create(drawQuadLight, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
+    BindTexture::create(drawQuadLight, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
+    CopyConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
+    BindConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
+    CopyConstantBuffer::create(drawQuadLight, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+    BindConstantBuffer::create(drawQuadLight, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(drawTransparent, transparentBuffer);
     SetViewport::create(drawTransparent, &gBufferViewport);
+#if RIGHT_HANDED
     SetDepthTest::create(drawTransparent, true, GL_LEQUAL);
-    SetCullFace::create(drawTransparent, false, GL_NONE, GL_NONE);
+#else
+    SetDepthTest::create(drawTransparent, true, GL_GEQUAL);
+#endif
+    SetCullFace::disable(drawTransparent);
     BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
     CopyConstantBuffer::create(drawTransparent, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(drawTransparent, frameDataBuffer, BINDING_POINT_FRAME_DATA);
@@ -306,11 +323,11 @@ int main(int argc, char* argv[]) {
     RenderQueue renderQueue(device, heapAllocator);
 
     //deferred shading
-    ModelInstance::draw(modelInstance0, 1, renderQueue, setGBuffer);
-    ModelInstance::draw(modelInstance2, 2, renderQueue, setGBuffer);
+    ModelInstance::draw(modelInstance0, 1, renderQueue, drawGBuffer);
+    ModelInstance::draw(modelInstance2, 2, renderQueue, drawGBuffer);
 
     //light accumulation
-    Model::draw(quadModel, 3, renderQueue, drawQuad);
+    Model::draw(quadModel, 3, renderQueue, drawQuadLight);
 
     //transparent materials
     ModelInstance::draw(modelInstance1, 4, renderQueue, drawTransparent);
@@ -319,8 +336,8 @@ int main(int argc, char* argv[]) {
     //todo change to glBlitFramebuffer?
     CommandBuffer* copyCommand = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(copyCommand, nullFramebuffer);
-    SetDepthTest::create(copyCommand, false, GL_NONE);
-    SetCullFace::create(copyCommand, true, GL_BACK, GL_CW);
+    SetDepthTest::disable(copyCommand);
+    SetCullFace::disable(copyCommand);
     SetViewport::create(copyCommand, &viewport);
     BindProgram::create(copyCommand, copyProgram);
     BindTexture::create(copyCommand, copyProgram, quadTexture, 0);
@@ -369,8 +386,11 @@ int main(int argc, char* argv[]) {
         mnMatrix4Identity(in_frameData.view.values);
 
         float fov = 45.0f * M_PI / 180.0f;
-        mnMatrix4Perspective(fov, viewport.width / (float)viewport.height, 0.001, 10, in_frameData.projection.values);
-//        mnMatrix4Ortho(-1, +1, -1, +1, -10, +10, in_frameData.projection.values);
+        float aspect = viewport.width / (float)viewport.height;
+        if (perspective)
+            mnMatrix4Perspective(fov, aspect, 0.001, 10, in_frameData.projection.values);
+        else
+            mnMatrix4Ortho(-1*aspect, +1*aspect, -1, +1, -10, +10, in_frameData.projection.values);
 
         float eye[3] = {sinf(angle)*2.5f, 0, cosf(angle)*2.5f};
         float center[3] = {0, 0, 0};
@@ -440,8 +460,8 @@ int main(int argc, char* argv[]) {
     Material::destroy(heapAllocator, diffuseMaterial);
     Material::destroy(heapAllocator, transparentMaterial);
     Material::destroy(heapAllocator, backgroundMaterial);
-    CommandBuffer::destroy(heapAllocator, setGBuffer);
-    CommandBuffer::destroy(heapAllocator, drawQuad);
+    CommandBuffer::destroy(heapAllocator, drawGBuffer);
+    CommandBuffer::destroy(heapAllocator, drawQuadLight);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
     CommandBuffer::destroy(heapAllocator, drawTransparent);
     CommandBuffer::destroy(heapAllocator, copyCommand);

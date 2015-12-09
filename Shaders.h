@@ -59,9 +59,8 @@ layout(std140) uniform in_InstanceData {
 out VertexData vtx;
 
 void main() {
-    vtx.position = projection * view * (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1));
-    //vtx.position = (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1)) * view * projection;
-    gl_Position = vtx.position;
+    vtx.position = instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    gl_Position = projection * view * vtx.position;
     vtx.texture = in_Texture;
 
     vec3 normal = normalize(mat3(instanceData[gl_InstanceID].in_Rotation) * in_Normal);
@@ -149,9 +148,8 @@ layout(std140) uniform in_InstanceData {
 out VertexData vtx;
 
 void main() {
-    vtx.position = projection * view * (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1));
-    //vtx.position = (instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1)) * view * projection;
-    gl_Position = vtx.position;
+    vtx.position = instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    gl_Position = projection * view * vtx.position;
     vtx.texture = in_Texture;
 
     vec3 normal = normalize(mat3(instanceData[gl_InstanceID].in_Rotation) * in_Normal);

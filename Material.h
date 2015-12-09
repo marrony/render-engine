@@ -34,10 +34,14 @@ struct Material {
 
         material->state = CommandBuffer::create(allocator, 10);
         BindProgram::create(material->state, diffuse->program);
+#if RIGHT_HANDED
         SetDepthTest::create(material->state, true, GL_LEQUAL);
-        SetBlend::create(material->state, false, 0, GL_NONE, GL_NONE, GL_NONE);
-        SetBlend::create(material->state, false, 1, GL_NONE, GL_NONE, GL_NONE);
-        SetBlend::create(material->state, false, 2, GL_NONE, GL_NONE, GL_NONE);
+#else
+        SetDepthTest::create(material->state, true, GL_GEQUAL);
+#endif
+        SetBlend::disable(material->state, 0);
+        SetBlend::disable(material->state, 1);
+        SetBlend::disable(material->state, 2);
 
         if(diffuse->mainUnit != -1) {
             BindTexture::create(material->state, diffuse->program, diffuse->mainTex, diffuse->mainUnit);
@@ -57,7 +61,11 @@ struct Material {
 
         material->state = CommandBuffer::create(allocator, 10);
         BindProgram::create(material->state, transparency->program);
+#if RIGHT_HANDED
         SetDepthTest::create(material->state, true, GL_LEQUAL);
+#else
+        SetDepthTest::create(material->state, true, GL_GEQUAL);
+#endif
         SetBlend::create(material->state, true, 0, GL_FUNC_ADD, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         if(transparency->mainUnit != -1) {

@@ -188,16 +188,16 @@ struct SetDepthTest {
         setDepthTest->function = function;
     }
 
+    static void disable(CommandBuffer* commandBuffer) {
+        create(commandBuffer, false, GL_NONE);
+    }
+
     static void submit(Device& device, SetDepthTest* cmd) {
         if(cmd->enable) {
             glEnable(GL_DEPTH_TEST);
-            glDepthFunc(cmd->function);
-
-//            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glDepthFunc(cmd->function); CHECK_ERROR;
         } else {
             glDisable(GL_DEPTH_TEST);
-
-//            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
     }
 };
@@ -217,11 +217,15 @@ struct SetCullFace {
         setCullFace->frontFace = frontFace;
     }
 
+    static void disable(CommandBuffer* commandBuffer) {
+        create(commandBuffer, false, GL_NONE, GL_NONE);
+    }
+
     static void submit(Device& device, SetCullFace* cmd) {
         if(cmd->enable) {
             glEnable(GL_CULL_FACE);
-            glCullFace(cmd->cullFace);
-            glFrontFace(cmd->frontFace);
+            glCullFace(cmd->cullFace); CHECK_ERROR;
+            glFrontFace(cmd->frontFace); CHECK_ERROR;
         } else {
             glDisable(GL_CULL_FACE);
         }
@@ -247,11 +251,15 @@ struct SetBlend {
         setBlend->dst = dst;
     }
 
+    static void disable(CommandBuffer* commandBuffer, int index) {
+        create(commandBuffer, false, index, GL_NONE, GL_NONE, GL_NONE);
+    }
+
     static void submit(Device& device, SetBlend* cmd) {
         if(cmd->enable) {
             glEnablei(GL_BLEND, cmd->index);
-            glBlendEquationSeparatei(cmd->index, cmd->equation, cmd->equation);
-            glBlendFuncSeparatei(cmd->index, cmd->src, cmd->dst, cmd->src, cmd->dst);
+            glBlendEquationSeparatei(cmd->index, cmd->equation, cmd->equation); CHECK_ERROR;
+            glBlendFuncSeparatei(cmd->index, cmd->src, cmd->dst, cmd->src, cmd->dst); CHECK_ERROR;
         } else {
             glDisablei(GL_BLEND, cmd->index);
         }

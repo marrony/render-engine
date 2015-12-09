@@ -5,11 +5,28 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
-//default opengl RIGHT_HANDED = 0 and ZERO_TO_ONE = 0
-//default dx RIGHT_HANDED = 1 and ZERO_TO_ONE = 1
-
 #define RIGHT_HANDED 0
 #define ZERO_TO_ONE 0
+
+#if RIGHT_HANDED
+#define mnMatrix4Frustum mnMatrix4FrustumRH
+#define mnMatrix4Ortho mnMatrix4OrthoRH
+#define mnMatrix4Perspective mnMatrix4PerspectiveRH
+#define mnMatrix4LookAt mnMatrix4LookAtRH
+#else
+#define mnMatrix4Frustum mnMatrix4FrustumLH
+#define mnMatrix4Ortho mnMatrix4OrthoLH
+#define mnMatrix4Perspective mnMatrix4PerspectiveLH
+#define mnMatrix4LookAt mnMatrix4LookAtLH
+#endif
+
+/*
+ * mnMatrix4Perspective is equivalent to
+ *
+ * fH = tan(fovy / 2) * znear;
+ * fW = fH * aspect
+ * mnMatrix4Frustum(-fW, +fW, -fH, +fH, znear, zfar, out);
+ */
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -249,7 +266,7 @@ void mnPoint4MulMatrix4(const float pt[4], const float mat[16], float out[4]) {
 
 //////////////////////////////////////////////////////////////////////////////
 
-void mnMatrix4Frustum(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
+void mnMatrix4FrustumRH(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
     const float diffx = right - left;
     const float diffy = top - bottom;
     const float diffz = zfar - znear;
@@ -257,8 +274,13 @@ void mnMatrix4Frustum(float left, float right, float bottom, float top, float zn
 
     const float a = (right + left) / diffx;
     const float b = (top + bottom) / diffy;
+#if ZERO_TO_ONE
+    const float c = -zfar / diffz;
+    const float d = -(zfar * znear) / diffz;
+#else
     const float c = -(zfar + znear) / diffz;
     const float d = -(2.0f * zfar * znear) / diffz;
+#endif
 
     out[0] = znear2 / diffx;  out[4] = 0;               out[ 8] = a;   out[12] = 0;
     out[1] = 0;               out[5] = znear2 / diffy;  out[ 9] = b;   out[13] = 0;
@@ -266,17 +288,37 @@ void mnMatrix4Frustum(float left, float right, float bottom, float top, float zn
     out[3] = 0;               out[7] = 0;               out[11] = -1;  out[15] = 0;
 }
 
+void mnMatrix4FrustumLH(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
+    const float diffx = right - left;
+    const float diffy = top - bottom;
+    const float diffz = zfar - znear;
+    const float znear2 = 2.0f * znear;
+
+    const float a = (right + left) / diffx;
+    const float b = (top + bottom) / diffy;
+#if ZERO_TO_ONE
+    const float c = zfar / diffz;
+    const float d = -(zfar * znear) / diffz;
+#else
+    const float c = (zfar + znear) / diffz;
+    const float d = -(2.0f * zfar * znear) / diffz;
+#endif
+
+    out[0] = znear2 / diffx;  out[4] = 0;               out[ 8] = a;   out[12] = 0;
+    out[1] = 0;               out[5] = znear2 / diffy;  out[ 9] = b;   out[13] = 0;
+    out[2] = 0;               out[6] = 0;               out[10] = c;   out[14] = d;
+    out[3] = 0;               out[7] = 0;               out[11] = 1;   out[15] = 0;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
-void mnMatrix4Ortho(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
+void mnMatrix4OrthoRH(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
     float diffx = right - left;
     float diffy = top - bottom;
     float diffz = zfar - znear;
 
     float tx = -(right + left) / diffx;
     float ty = -(top + bottom) / diffy;
-
-#if RIGHT_HANDED
 
 #if ZERO_TO_ONE
     out[0] = 2.0f / diffx; out[4] = 0;            out[ 8] = 0;                        out[12] = 0;
@@ -289,10 +331,17 @@ void mnMatrix4Ortho(float left, float right, float bottom, float top, float znea
     out[2] = 0;            out[6] = 0;            out[10] = -2.0f / diffz;            out[14] = 0;
     out[3] = tx;           out[7] = ty;           out[11] = -(zfar + znear) / diffz;  out[15] = 1;
 #endif
+}
 
-#else //RIGHT_HANDED
+void mnMatrix4OrthoLH(float left, float right, float bottom, float top, float znear, float zfar, float out[16]) {
+    float diffx = right - left;
+    float diffy = top - bottom;
+    float diffz = zfar - znear;
 
-    #if ZERO_TO_ONE
+    float tx = -(right + left) / diffx;
+    float ty = -(top + bottom) / diffy;
+
+#if ZERO_TO_ONE
     out[0] = 2.0f / diffx; out[4] = 0;            out[ 8] = 0;             out[12] = tx;
     out[1] = 0;            out[5] = 2.0f / diffy; out[ 9] = 0;             out[13] = ty;
     out[2] = 0;            out[6] = 0;            out[10] = 1.0f / diffz;  out[14] = -znear / diffz;
@@ -303,37 +352,30 @@ void mnMatrix4Ortho(float left, float right, float bottom, float top, float znea
     out[2] = 0;            out[6] = 0;            out[10] = 2.0f / diffz;  out[14] = -(zfar + znear) / diffz;
     out[3] = 0;            out[7] = 0;            out[11] = 0;             out[15] = 1;
 #endif
-
-#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
-void mnMatrix4Ortho(float left, float right, float bottom, float top, float out[16]) {
-    return mnMatrix4Ortho(left, right, bottom, top, -1.0f, +1.0f, out);
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
-void mnMatrix4Perspective(float fovy, float aspect, float znear, float zfar, float out[16]) {
+void mnMatrix4PerspectiveRH(float fovy, float aspect, float znear, float zfar, float out[16]) {
     float f = 1.0f / tanf(fovy / 2.0f);
-    float diffz = zfar - znear;
-
-#if RIGHT_HANDED
+    float diffz = znear - zfar;
 
 #if ZERO_TO_ONE
     out[0] = f / aspect;  out[4] = 0;  out[ 8] = 0;                            out[12] = 0;
     out[1] = 0;           out[5] = f;  out[ 9] = 0;                            out[13] = 0;
-    out[2] = 0;           out[6] = 0;  out[10] = -zfar / diffz;                out[14] = -1;
-    out[3] = 0;           out[7] = 0;  out[11] = -(zfar * znear) / diffz;      out[15] = 0;
+    out[2] = 0;           out[6] = 0;  out[10] = zfar / diffz;                 out[14] = (zfar * znear) / diffz;
+    out[3] = 0;           out[7] = 0;  out[11] = -1;                           out[15] = 0;
 #else
     out[0] = f / aspect;  out[4] = 0;  out[ 8] = 0;                            out[12] = 0;
     out[1] = 0;           out[5] = f;  out[ 9] = 0;                            out[13] = 0;
-    out[2] = 0;           out[6] = 0;  out[10] = -(zfar+znear) / diffz;        out[14] = -1;
-    out[3] = 0;           out[7] = 0;  out[11] = -(2 * zfar * znear) / diffz;  out[15] = 0;
+    out[2] = 0;           out[6] = 0;  out[10] = (zfar+znear) / diffz;         out[14] = (2 * zfar * znear) / diffz;
+    out[3] = 0;           out[7] = 0;  out[11] = -1;                           out[15] = 0;
 #endif
+}
 
-#else //RIGHT_HANDED
+void mnMatrix4PerspectiveLH(float fovy, float aspect, float znear, float zfar, float out[16]) {
+    float f = 1.0f / tanf(fovy / 2.0f);
+    float diffz = zfar - znear;
 
 #if ZERO_TO_ONE
     out[0] = f / aspect;  out[4] = 0;  out[ 8] = 0;                      out[12] = 0;
@@ -346,62 +388,161 @@ void mnMatrix4Perspective(float fovy, float aspect, float znear, float zfar, flo
     out[2] = 0;           out[6] = 0;  out[10] = (zfar+znear) / diffz;   out[14] = -(2 * zfar * znear) / diffz;
     out[3] = 0;           out[7] = 0;  out[11] = 1;                      out[15] = 0;
 #endif
-
-#endif //RIGHT_HANDED
-
 }
 
 //////////////////////////////////////////////////////////////////////////////
 
-void mnMatrix4LookAt(const float eye[3], const float at[3], float out[16]) {
-    float x[3], y[3], z[3];
+void mnMatrix4LookAtRH(const float eye[3], const float at[3], float out[16]) {
+    float s[3], u[3], f[3];
     float up[3] = {0.0f, 1.0f, 0.0f};
 
-#if RIGHT_HANDED
-    mnVector3Sub(eye, at, z);
-    mnVector3Normalize(z, z);
+    mnVector3Sub(at, eye, f);
+    mnVector3Normalize(f, f);
 
-    if(1.0f - fabsf(z[1]) <= 0.005f) {
-        z[0] = 0;
-        z[1] = 0;
-        z[2] = -1;
+    if(1.0f - fabsf(f[1]) <= 0.005f) {
+        f[0] = 0;
+        f[1] = 0;
+        f[2] = -1;
     } else {
-        mnVector3Cross(up, z, x);
+        mnVector3Cross(f, up, s);
     }
 
-    mnVector3Cross(z, x, y);
+    mnVector3Cross(s, f, u);
 
-    float tx = mnVector3Dot(x, eye);
-    float ty = mnVector3Dot(y, eye);
-    float tz = mnVector3Dot(z, eye);
+    float tx = -mnVector3Dot(s, eye);
+    float ty = -mnVector3Dot(u, eye);
+    float tz = mnVector3Dot(f, eye);
 
-    out[0] = x[0];  out[4] = y[0];  out[ 8] = z[0];  out[12] = 0;
-    out[1] = x[1];  out[5] = y[1];  out[ 9] = z[1];  out[13] = 0;
-    out[2] = x[2];  out[6] = y[2];  out[10] = z[2];  out[14] = 0;
-    out[3] = tx;    out[7] = ty;    out[11] = tz;    out[15] = 1;
-#else
-    mnVector3Sub(at, eye, z);
-    mnVector3Normalize(z, z);
+    out[0] =  s[0];  out[4] =  s[1];  out[ 8] =  s[2];  out[12] = tx;
+    out[1] =  u[0];  out[5] =  u[1];  out[ 9] =  u[2];  out[13] = ty;
+    out[2] = -f[0];  out[6] = -f[1];  out[10] = -f[2];  out[14] = tz;
+    out[3] = 0;      out[7] = 0;      out[11] = 0;      out[15] = 1;
+}
 
-    if(1.0f - fabsf(z[1]) <= 0.005f) {
-        z[0] = 0;
-        z[1] = 0;
-        z[2] = 1;
+void mnMatrix4LookAtLH(const float eye[3], const float at[3], float out[16]) {
+    float s[3], u[3], f[3];
+    float up[3] = {0.0f, 1.0f, 0.0f};
+
+    mnVector3Sub(at, eye, f);
+    mnVector3Normalize(f, f);
+
+    if(1.0f - fabsf(f[1]) <= 0.005f) {
+        f[0] = 0;
+        f[1] = 0;
+        f[2] = 1;
     } else {
-        mnVector3Cross(up, z, x);
+        mnVector3Cross(up, f, s);
     }
 
-    mnVector3Cross(z, x, y);
+    mnVector3Cross(f, s, u);
 
-    float tx = -mnVector3Dot(x, eye);
-    float ty = -mnVector3Dot(y, eye);
-    float tz = -mnVector3Dot(z, eye);
+    float tx = -mnVector3Dot(s, eye);
+    float ty = -mnVector3Dot(u, eye);
+    float tz = -mnVector3Dot(f, eye);
 
-    out[0] = x[0];  out[4] = x[1];  out[ 8] = x[2];  out[12] = tx;
-    out[1] = y[0];  out[5] = y[1];  out[ 9] = y[2];  out[13] = ty;
-    out[2] = z[0];  out[6] = z[1];  out[10] = z[2];  out[14] = tz;
+    out[0] = s[0];  out[4] = s[1];  out[ 8] = s[2];  out[12] = tx;
+    out[1] = u[0];  out[5] = u[1];  out[ 9] = u[2];  out[13] = ty;
+    out[2] = f[0];  out[6] = f[1];  out[10] = f[2];  out[14] = tz;
     out[3] = 0;     out[7] = 0;     out[11] = 0;     out[15] = 1;
-#endif
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+float determinant2x2(float a, float b, float c, float d) {
+    return a*d - b*c;
+}
+
+float determinant3x3(float a, float b, float c, float d, float e, float f, float g, float h, float i) {
+    float ca = +determinant2x2(e, f, h, i);
+    float cb = -determinant2x2(d, f, g, i);
+    float cc = +determinant2x2(d, e, g, h);
+
+    return a*ca + b*cb + c*cc;
+}
+
+bool mnMatrix4Inverse(const float mat[16], float* detOut, float out[16]) {
+    float a = +determinant3x3(mat[5], mat[9], mat[13], mat[6], mat[10], mat[14], mat[7], mat[11], mat[15]);
+    float b = -determinant3x3(mat[1], mat[9], mat[13], mat[2], mat[10], mat[14], mat[3], mat[11], mat[15]);
+    float c = +determinant3x3(mat[1], mat[5], mat[13], mat[2], mat[ 6], mat[14], mat[3], mat[ 7], mat[15]);
+    float d = -determinant3x3(mat[1], mat[5], mat[ 9], mat[2], mat[ 6], mat[10], mat[3], mat[ 7], mat[11]);
+
+    float det = a*mat[0] + b*mat[4] + c*mat[8] + d*mat[12];
+
+    if(fabs(det) <= 0.001) {
+        return false;
+    }
+
+    float e = -determinant3x3(mat[4], mat[8], mat[12], mat[6], mat[10], mat[14], mat[7], mat[11], mat[15]);
+    float f = +determinant3x3(mat[0], mat[8], mat[12], mat[2], mat[10], mat[14], mat[3], mat[11], mat[15]);
+    float g = -determinant3x3(mat[0], mat[4], mat[12], mat[2], mat[ 6], mat[14], mat[3], mat[ 7], mat[15]);
+    float h = +determinant3x3(mat[0], mat[4], mat[ 8], mat[2], mat[ 6], mat[10], mat[3], mat[ 7], mat[11]);
+
+    float i = +determinant3x3(mat[4], mat[8], mat[12], mat[5], mat[9], mat[13], mat[7], mat[11], mat[15]);
+    float j = -determinant3x3(mat[0], mat[8], mat[12], mat[1], mat[9], mat[13], mat[3], mat[11], mat[15]);
+    float k = +determinant3x3(mat[0], mat[4], mat[12], mat[1], mat[5], mat[13], mat[3], mat[ 7], mat[15]);
+    float l = -determinant3x3(mat[0], mat[4], mat[ 8], mat[1], mat[5], mat[ 9], mat[3], mat[ 7], mat[11]);
+
+    float m = -determinant3x3(mat[4], mat[8], mat[12], mat[5], mat[9], mat[13], mat[6], mat[10], mat[14]);
+    float n = +determinant3x3(mat[0], mat[8], mat[12], mat[1], mat[9], mat[13], mat[2], mat[10], mat[14]);
+    float o = -determinant3x3(mat[0], mat[4], mat[12], mat[1], mat[5], mat[13], mat[2], mat[ 6], mat[14]);
+    float p = +determinant3x3(mat[0], mat[4], mat[ 8], mat[1], mat[5], mat[ 9], mat[2], mat[ 6], mat[10]);
+
+    float invDet = 1.0f / det;
+
+    out[0] = a*invDet;  out[4] = e*invDet;  out[ 8] = i*invDet;  out[12] = m*invDet;
+    out[1] = b*invDet;  out[5] = f*invDet;  out[ 9] = j*invDet;  out[13] = n*invDet;
+    out[2] = c*invDet;  out[6] = g*invDet;  out[10] = k*invDet;  out[14] = o*invDet;
+    out[3] = d*invDet;  out[7] = h*invDet;  out[11] = l*invDet;  out[15] = p*invDet;
+
+    if(detOut != nullptr)
+        *detOut = det;
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+void mnMatrix4Transpose(const float mat[16], float out[16]) {
+    out[0] = mat[0];
+    out[5] = mat[5];
+    out[10] = mat[10];
+    out[15] = mat[15];
+
+    {
+        float a = mat[1];
+        float b = mat[4];
+        out[4] = a; out[1] = b;
+    }
+
+    {
+        float a = mat[2];
+        float b = mat[8];
+        out[8] = a; out[2] = b;
+    }
+
+    {
+        float a = mat[3];
+        float b = mat[12];
+        out[12] = a; out[3] = b;
+    }
+
+    {
+        float a = mat[6];
+        float b = mat[9];
+        out[9] = a; out[6] = b;
+    }
+
+    {
+        float a = mat[7];
+        float b = mat[13];
+        out[13] = a; out[7] = b;
+    }
+
+    {
+        float a = mat[11];
+        float b = mat[14];
+        out[14] = a; out[11] = b;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////
