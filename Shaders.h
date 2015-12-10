@@ -39,6 +39,26 @@ vec3 calculateLight(vec3 position, vec3 normal, vec4 albedo, LightData light) {
     return max(dot(normal, lightDir), 0) * albedo.rgb * light.color;
 }
 
+struct GBuffer {
+    vec3 position;
+    vec3 normal;
+    vec4 color;
+};
+
+void writeGBuffer(GBuffer gBuffer, out vec4 buffer0, out vec4 buffer1, out vec4 buffer2) {
+    buffer0 = vec4(gBuffer.position, 1);
+    buffer1 = vec4(gBuffer.normal, 1);
+    buffer2 = gBuffer.color;
+}
+
+GBuffer readGBuffer(vec4 buffer0, vec4 buffer1, vec4 buffer2) {
+    GBuffer gBuffer;
+    gBuffer.position = buffer0.xyz;
+    gBuffer.normal = buffer1.xyz;
+    gBuffer.color = buffer2;
+    return gBuffer;
+}
+
 );
 
 const char* vertexSource = STR(
@@ -116,17 +136,29 @@ layout(std140) uniform in_InstanceData {
 uniform sampler2D in_MainTex;
 uniform sampler2D in_BumpMap;
 
-layout(location = 0) out vec3 out_Position;
-layout(location = 1) out vec3 out_Normal;
+layout(location = 0) out vec4 out_Position;
+layout(location = 1) out vec4 out_Normal;
 layout(location = 2) out vec4 out_Albedo;
 
-void main() {
-    vec3 normal = texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
+vec3 getNormal() {
+    return texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
+}
 
-    out_Position = vtx.position.xyz;
-    out_Normal = normalize(vtx.tbn * normal);
-    out_Albedo.rgb = texture(in_MainTex, vtx.texture).rgb * vtx.color.rgb;
-    out_Albedo.w = 1;
+vec4 getBaseColor() {
+    return vec4(texture(in_MainTex, vtx.texture).rgb * vtx.color.rgb, 1);
+}
+
+vec4 getPosition() {
+    return vtx.position;
+}
+
+void main() {
+    GBuffer gBuffer;
+    gBuffer.position = getPosition().xyz;
+    gBuffer.normal = normalize(vtx.tbn * getNormal());
+    gBuffer.color = getBaseColor();
+
+    writeGBuffer(gBuffer, out_Position, out_Normal, out_Albedo);
 }
 );
 
@@ -177,11 +209,23 @@ uniform sampler2D in_BumpMap;
 
 layout(location = 0) out vec4 out_Color;
 
-void main() {
-    vec3 normal = texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
-    vec4 albedo = texture(in_MainTex, vtx.texture);
+vec4 getBaseColor() {
+    return texture(in_MainTex, vtx.texture);
+}
 
-    vec3 position = vtx.position.xyz;
+vec3 getNormal() {
+    return texture(in_BumpMap, vtx.texture).xyz * 2.0 - 1.0;
+}
+
+vec4 getPosition() {
+    return vtx.position;
+}
+
+void main() {
+    vec3 normal = getNormal();
+    vec4 albedo = getBaseColor();
+    vec3 position = getPosition().xyz;
+
     normal = normalize(vtx.tbn * normal);
 
     float alpha = 0.5;
@@ -250,9 +294,14 @@ uniform sampler2D in_Albedo;
 layout(location = 0) out vec4 out_FragColor;
 
 void main() {
-    vec3 position = texture(in_Position, geo_Texture).rgb;
-    vec3 normal = texture(in_Normal, geo_Texture).rgb;
-    vec4 albedo = texture(in_Albedo, geo_Texture);
+    vec4 buffer0 = texture(in_Position, geo_Texture);
+    vec4 buffer1 = texture(in_Normal, geo_Texture);
+    vec4 buffer2 = texture(in_Albedo, geo_Texture);
+    GBuffer gBuffer = readGBuffer(buffer0, buffer1, buffer2);
+
+    vec3 position = gBuffer.position;
+    vec3 normal = gBuffer.normal;
+    vec4 albedo = gBuffer.color;
 
     vec3 lighting = albedo.rgb * 0.2;
     lighting += calculateLight(position, normal, albedo, lightData[0]);
