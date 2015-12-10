@@ -678,12 +678,7 @@ public:
 
     void copyConstantBuffer(ConstantBuffer constantBuffer, const void* data, size_t size) {
         glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.id); CHECK_ERROR;
-
-        void* buffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY); CHECK_ERROR;
-
-        memcpy(buffer, data, size);
-
-        glUnmapBuffer(GL_UNIFORM_BUFFER); CHECK_ERROR;
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, size, data); CHECK_ERROR;
     }
 
     void bindTexture(Program program, Texture2D texture, int unit) {
