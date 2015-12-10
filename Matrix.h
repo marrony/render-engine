@@ -12,11 +12,13 @@
 #define mnMatrix4Frustum mnMatrix4FrustumRH
 #define mnMatrix4Ortho mnMatrix4OrthoRH
 #define mnMatrix4Perspective mnMatrix4PerspectiveRH
+#define mnMatrix4InfinitePerspective mnMatrix4InfinitePerspectiveRH
 #define mnMatrix4LookAt mnMatrix4LookAtRH
 #else
 #define mnMatrix4Frustum mnMatrix4FrustumLH
 #define mnMatrix4Ortho mnMatrix4OrthoLH
 #define mnMatrix4Perspective mnMatrix4PerspectiveLH
+#define mnMatrix4InfinitePerspective mnMatrix4InfinitePerspectiveLH
 #define mnMatrix4LookAt mnMatrix4LookAtLH
 #endif
 
@@ -101,8 +103,8 @@ void mnMatrix4RotateX(float angle, float out[16]) {
     float s = sinf(angle);
 
     out[ 5] = c;
-    out[ 9] = -s;
     out[ 6] = s;
+    out[ 9] = -s;
     out[10] = c;
 }
 
@@ -115,8 +117,8 @@ void mnMatrix4RotateY(float angle, float out[16]) {
     float s = sinf(angle);
 
     out[ 0] = c;
-    out[ 8] = s;
     out[ 2] = -s;
+    out[ 8] = s;
     out[10] = c;
 }
 
@@ -129,8 +131,8 @@ void mnMatrix4RotateZ(float angle, float out[16]) {
     float s = sinf(angle);
 
     out[0] = c;
-    out[4] = -s;
     out[1] = s;
+    out[4] = -s;
     out[5] = c;
 }
 
@@ -392,48 +394,66 @@ void mnMatrix4PerspectiveLH(float fovy, float aspect, float znear, float zfar, f
 
 //////////////////////////////////////////////////////////////////////////////
 
-void mnMatrix4LookAtRH(const float eye[3], const float at[3], float out[16]) {
-    float s[3], u[3], f[3];
-    float up[3] = {0.0f, 1.0f, 0.0f};
+void mnMatrix4InfinitePerspectiveRH(float fovy, float aspect, float znear, float out[16]) {
+    float range = tanf(fovy / 2.0f) * znear;
+    float l = -range * aspect;
+    float r = +range * aspect;
+    float b = -range;
+    float t = +range;
+    float diffx = r - l;
+    float diffy = t - b;
 
-    mnVector3Sub(at, eye, f);
+    out[0] = 2*znear/diffx;  out[4] = 0;              out[ 8] = 0;    out[12] = 0;
+    out[1] = 0;              out[5] = 2*znear/diffy;  out[ 9] = 0;    out[13] = 0;
+    out[2] = 0;              out[6] = 0;              out[10] = -1;   out[14] = -2*znear;
+    out[3] = 0;              out[7] = 0;              out[11] = -1;   out[15] = 0;
+}
+
+void mnMatrix4InfinitePerspectiveLH(float fovy, float aspect, float znear, float out[16]) {
+    float range = tanf(fovy / 2.0f) * znear;
+    float l = -range * aspect;
+    float r = +range * aspect;
+    float b = -range;
+    float t = +range;
+    float diffx = r - l;
+    float diffy = t - b;
+
+    out[0] = 2*znear/diffx;  out[4] = 0;              out[ 8] = 0;    out[12] = 0;
+    out[1] = 0;              out[5] = 2*znear/diffy;  out[ 9] = 0;    out[13] = 0;
+    out[2] = 0;              out[6] = 0;              out[10] = 1;    out[14] = -2*znear;
+    out[3] = 0;              out[7] = 0;              out[11] = 1;    out[15] = 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+void mnMatrix4LookAtRH(const float eye[3], const float at[3], float out[16]) {
+    const float up[3] = {0, 1, 0};
+    float s[3], u[3], f[3];
+
+    mnVector3Sub(eye, at, f);
     mnVector3Normalize(f, f);
 
-    if(1.0f - fabsf(f[1]) <= 0.005f) {
-        f[0] = 0;
-        f[1] = 0;
-        f[2] = -1;
-    } else {
-        mnVector3Cross(f, up, s);
-    }
-
-    mnVector3Cross(s, f, u);
+    mnVector3Cross(up, f, s);
+    mnVector3Cross(f, s, u);
 
     float tx = -mnVector3Dot(s, eye);
     float ty = -mnVector3Dot(u, eye);
-    float tz = mnVector3Dot(f, eye);
+    float tz = -mnVector3Dot(f, eye);
 
-    out[0] =  s[0];  out[4] =  s[1];  out[ 8] =  s[2];  out[12] = tx;
-    out[1] =  u[0];  out[5] =  u[1];  out[ 9] =  u[2];  out[13] = ty;
-    out[2] = -f[0];  out[6] = -f[1];  out[10] = -f[2];  out[14] = tz;
-    out[3] = 0;      out[7] = 0;      out[11] = 0;      out[15] = 1;
+    out[0] = s[0];  out[4] = s[1];  out[ 8] = s[2];  out[12] = tx;
+    out[1] = u[0];  out[5] = u[1];  out[ 9] = u[2];  out[13] = ty;
+    out[2] = f[0];  out[6] = f[1];  out[10] = f[2];  out[14] = tz;
+    out[3] = 0;     out[7] = 0;     out[11] = 0;     out[15] = 1;
 }
 
 void mnMatrix4LookAtLH(const float eye[3], const float at[3], float out[16]) {
+    const float up[3] = {0, 1, 0};
     float s[3], u[3], f[3];
-    float up[3] = {0.0f, 1.0f, 0.0f};
 
     mnVector3Sub(at, eye, f);
     mnVector3Normalize(f, f);
 
-    if(1.0f - fabsf(f[1]) <= 0.005f) {
-        f[0] = 0;
-        f[1] = 0;
-        f[2] = 1;
-    } else {
-        mnVector3Cross(up, f, s);
-    }
-
+    mnVector3Cross(up, f, s);
     mnVector3Cross(f, s, u);
 
     float tx = -mnVector3Dot(s, eye);
