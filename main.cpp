@@ -62,9 +62,15 @@ void check_error(const char* file, int line) {
 #include "TextureManager.h"
 #include "Shaders.h"
 
-Viewport viewport = {};
+Rect viewport = {};
 
-bool perspective = true;
+enum ProjectionType {
+    PERSPECTIVE,
+    PERSPECTIVE_INFINITE,
+    ORTHO
+};
+
+ProjectionType projection = PERSPECTIVE;
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -82,8 +88,12 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_LEFT /*&& action == GLFW_PRESS*/)
         viewport.width--;
 
-    if (key == GLFW_KEY_P && action == GLFW_RELEASE)
-        perspective = !perspective;
+    if (key == GLFW_KEY_1 && action == GLFW_RELEASE)
+        projection = PERSPECTIVE;
+    if (key == GLFW_KEY_2 && action == GLFW_RELEASE)
+        projection = PERSPECTIVE_INFINITE;
+    if (key == GLFW_KEY_3 && action == GLFW_RELEASE)
+        projection = ORTHO;
 }
 
 void framebuffer_callback(GLFWwindow* window, int width, int height) {
@@ -164,22 +174,28 @@ int main(int argc, char* argv[]) {
     Texture2D texture2 = textureManager.loadTexture("images/stained_glass.tga");
     Texture2D texture3 = device.createRGBATexture(2, 2, pixels);
 
+    device.setTextureBindingPoint(programOpaque, "in_MainTex", 0);
+    device.setTextureBindingPoint(programOpaque, "in_BumpMap", 1);
+
     MaterialBumpedDiffuse bumpedDiffuse;
     bumpedDiffuse.program = programOpaque;
-    bumpedDiffuse.mainUnit = device.getUniformLocation(programOpaque, "in_MainTex");
+    bumpedDiffuse.mainUnit = 0;
     bumpedDiffuse.mainTex = texture0;
     bumpedDiffuse.mainSampler = textureManager.getLinear();
-    bumpedDiffuse.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
+    bumpedDiffuse.bumpUnit = 1;
     bumpedDiffuse.bumpMap = texture1;
     bumpedDiffuse.bumpSampler = textureManager.getNearest();
     Material* diffuseMaterial = Material::create(heapAllocator, &bumpedDiffuse);
 
+    device.setTextureBindingPoint(programTransparent, "in_MainTex", 0);
+    device.setTextureBindingPoint(programTransparent, "in_BumpMap", 1);
+
     MaterialTransparency transparency;
     transparency.program = programTransparent;
-    transparency.mainUnit = device.getUniformLocation(programTransparent, "in_MainTex");
+    transparency.mainUnit = 0;
     transparency.mainTex = texture2;
     transparency.mainSampler = textureManager.getLinear();
-    transparency.bumpUnit = device.getUniformLocation(programTransparent, "in_BumpMap");
+    transparency.bumpUnit = 1;
     transparency.bumpMap = texture3;
     transparency.bumpSampler = textureManager.getNearest();
     transparency.alpha = 0.5;
@@ -187,10 +203,10 @@ int main(int argc, char* argv[]) {
 
     MaterialBumpedDiffuse bumpedDiffuse2;
     bumpedDiffuse2.program = programOpaque;
-    bumpedDiffuse2.mainUnit = device.getUniformLocation(programOpaque, "in_MainTex");
+    bumpedDiffuse2.mainUnit = 0;
     bumpedDiffuse2.mainTex = texture2;
     bumpedDiffuse2.mainSampler = textureManager.getLinear();
-    bumpedDiffuse2.bumpUnit = device.getUniformLocation(programOpaque, "in_BumpMap");
+    bumpedDiffuse2.bumpUnit = 1;
     bumpedDiffuse2.bumpMap = texture3;
     bumpedDiffuse2.bumpSampler = textureManager.getNearest();
     Material* backgroundMaterial = Material::create(heapAllocator, &bumpedDiffuse2);
@@ -229,10 +245,12 @@ int main(int argc, char* argv[]) {
 
     modelManager.destroyModel(sphereModel);
 
+    int w, h;
+    glfwGetFramebufferSize(window, &w, &h);
     viewport.x = 0;
     viewport.y = 0;
-    glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
-    glViewport(0, 0, viewport.width, viewport.height);
+    viewport.width = w;
+    viewport.height = h;
 
     int wgbuffer = 1024;
     int hgbuffer = 768;
@@ -267,10 +285,16 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(commonSource, quadVertexSource, quadFragmentSource, quadGeometrySource);
     Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
 
-    Viewport gBufferViewport = {0, 0, wgbuffer, hgbuffer};
-    CommandBuffer* drawGBuffer = CommandBuffer::create(heapAllocator, 10);
+    device.setTextureBindingPoint(quadProgram, "in_Position", 0);
+    device.setTextureBindingPoint(quadProgram, "in_Normal", 1);
+    device.setTextureBindingPoint(quadProgram, "in_Albedo", 2);
+
+    device.setTextureBindingPoint(copyProgram, "in_Texture", 0);
+
+    Rect gBufferViewport = {0, 0, (float)wgbuffer, (float)hgbuffer};
+    CommandBuffer* drawGBuffer = CommandBuffer::create(heapAllocator, 11);
     BindFramebuffer::create(drawGBuffer, gBuffer);
-    SetViewport::create(drawGBuffer, &gBufferViewport);
+    SetViewport::create(drawGBuffer, 0, &gBufferViewport);
     ClearColor::create(drawGBuffer, 0, 0.00, 0.00, 0.00, 1); //position
     ClearColor::create(drawGBuffer, 1, 0.00, 0.00, 0.00, 1); //normal
     ClearColor::create(drawGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
@@ -295,13 +319,13 @@ int main(int argc, char* argv[]) {
     Framebuffer nullFramebuffer = {0};
     CommandBuffer* drawQuadLight = CommandBuffer::create(heapAllocator, 20);
     BindFramebuffer::create(drawQuadLight, transparentBuffer);
-    SetViewport::create(drawQuadLight, &gBufferViewport);
+    SetViewport::create(drawQuadLight, 0, &gBufferViewport);
     SetDepthTest::disable(drawQuadLight);
     SetCullFace::disable(drawQuadLight);
     BindProgram::create(drawQuadLight, quadProgram);
-    BindTexture::create(drawQuadLight, quadProgram, position, device.getUniformLocation(quadProgram, "in_Position"));
-    BindTexture::create(drawQuadLight, quadProgram, normal, device.getUniformLocation(quadProgram, "in_Normal"));
-    BindTexture::create(drawQuadLight, quadProgram, albedo, device.getUniformLocation(quadProgram, "in_Albedo"));
+    BindTexture::create(drawQuadLight, quadProgram, position, textureManager.getNearest(), 0);
+    BindTexture::create(drawQuadLight, quadProgram, normal, textureManager.getNearest(), 1);
+    BindTexture::create(drawQuadLight, quadProgram, albedo, textureManager.getNearest(), 2);
     CopyConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
     BindConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
     CopyConstantBuffer::create(drawQuadLight, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
@@ -309,7 +333,7 @@ int main(int argc, char* argv[]) {
 
     CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(drawTransparent, transparentBuffer);
-    SetViewport::create(drawTransparent, &gBufferViewport);
+    SetViewport::create(drawTransparent, 0, &gBufferViewport);
 #if RIGHT_HANDED
     SetDepthTest::create(drawTransparent, true, GL_LEQUAL);
 #else
@@ -338,9 +362,9 @@ int main(int argc, char* argv[]) {
     BindFramebuffer::create(copyCommand, nullFramebuffer);
     SetDepthTest::disable(copyCommand);
     SetCullFace::disable(copyCommand);
-    SetViewport::create(copyCommand, &viewport);
+    SetViewport::create(copyCommand, 0, &viewport);
     BindProgram::create(copyCommand, copyProgram);
-    BindTexture::create(copyCommand, copyProgram, quadTexture, 0);
+    BindTexture::create(copyCommand, copyProgram, quadTexture, textureManager.getNearest(), 0);
     Model::draw(quadModel, 10, renderQueue, copyCommand);
 
     CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
@@ -387,10 +411,17 @@ int main(int argc, char* argv[]) {
 
         float fov = 45.0f * M_PI / 180.0f;
         float aspect = viewport.width / (float)viewport.height;
-        if (perspective)
+        switch (projection) {
+        case PERSPECTIVE:
             mnMatrix4Perspective(fov, aspect, 0.001, 10, in_frameData.projection.values);
-        else
+            break;
+        case PERSPECTIVE_INFINITE:
+            mnMatrix4InfinitePerspective(fov, aspect, 0.001, in_frameData.projection.values);
+            break;
+        case ORTHO:
             mnMatrix4Ortho(-1*aspect, +1*aspect, -1, +1, -10, +10, in_frameData.projection.values);
+            break;
+        }
 
         float eye[3] = {sinf(angle)*2.5f, 0, cosf(angle)*2.5f};
         float center[3] = {0, 0, 0};
@@ -444,8 +475,24 @@ int main(int argc, char* argv[]) {
 
         CommandBuffer::execute(commandBuffer, device);
 
+        const char* str;
+
+        switch (projection) {
+        case PERSPECTIVE:
+            str = "Perspective";
+            break;
+        case PERSPECTIVE_INFINITE:
+            str = "Perspective Infinite";
+            break;
+        case ORTHO:
+            str = "Orthographic";
+            break;
+        }
+
+
+        textManager.printText(fontItalic, 10, 280, "Projection: %s", str);
         textManager.printText(fontItalic, 10, 230, "Fps: %d Angle: %f", fps2, angle);
-        textManager.printText(fontRegular, 10, 180, "viewport: %d %d %d %d", viewport.x, viewport.y, viewport.width, viewport.height);
+        textManager.printText(fontRegular, 10, 180, "viewport: %.2f %.2f %.2f %.2f", viewport.x, viewport.y, viewport.width, viewport.height);
         textManager.printText(fontRegular, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
         textManager.printText(fontRegular, 10, 80, "Executed commands %d | %.2f%% executed",

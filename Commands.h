@@ -12,13 +12,32 @@ enum CommandType {
     DRAW_TRIANGLES_INSTANCED,
     DRAW_COMMANDS_MAX = DRAW_TRIANGLES_INSTANCED,
     BIND_FRAMEBUFFER,
-    SET_VIEWPORT,
+    SET_VIEWPORT0,
+    SET_VIEWPORT1,
+    SET_VIEWPORT2,
+    SET_VIEWPORT3,
+    SET_SCISSOR0,
+    SET_SCISSOR1,
+    SET_SCISSOR2,
+    SET_SCISSOR3,
     SET_DEPTH_TEST,
     SET_CULL_FACE,
-    SET_BLEND,
+    SET_BLEND0,
+    SET_BLEND1,
+    SET_BLEND2,
+    SET_BLEND3,
+    SET_BLEND4,
+    SET_BLEND5,
+    SET_BLEND6,
+    SET_BLEND7,
     CLEAR_COLOR0,
     CLEAR_COLOR1,
     CLEAR_COLOR2,
+    CLEAR_COLOR3,
+    CLEAR_COLOR4,
+    CLEAR_COLOR5,
+    CLEAR_COLOR6,
+    CLEAR_COLOR7,
     CLEAR_DEPTH_STENCIL,
     COPY_CONSTANT_BUFFER,
     BIND_CONSTANT_BUFFER,
@@ -27,7 +46,11 @@ enum CommandType {
     BIND_TEXTURE0,
     BIND_TEXTURE1,
     BIND_TEXTURE2,
-    BIND_SAMPLER,
+    BIND_TEXTURE3,
+    BIND_TEXTURE4,
+    BIND_TEXTURE5,
+    BIND_TEXTURE6,
+    BIND_TEXTURE7,
     COMMAND_MAX
 };
 
@@ -157,21 +180,48 @@ struct ClearDepthStencil {
 
 struct SetViewport {
     Command command;
-    Viewport* viewport;
+    Rect* viewport;
 
-    static const uint32_t TYPE = SET_VIEWPORT;
+    static const uint32_t TYPE = SET_VIEWPORT0;
 
-    static void create(CommandBuffer* commandBuffer, Viewport* viewport) {
+    static void create(CommandBuffer* commandBuffer, int index, Rect* viewport) {
         SetViewport* setViewport = getCommand<SetViewport>(commandBuffer);
+        setViewport->command.id += index;
         setViewport->viewport = viewport;
     }
 
     static void submit(Device& device, SetViewport* cmd) {
-        Viewport* viewport = cmd->viewport;
+        int index = cmd->command.id - SET_VIEWPORT0;
+        Rect* viewport = cmd->viewport;
 
-        glEnable(GL_SCISSOR_TEST);
-        glViewport(viewport->x, viewport->y, viewport->width, viewport->height);
-        glScissor(viewport->x, viewport->y, viewport->width, viewport->height);
+        glViewportIndexedf(index, viewport->x, viewport->y, viewport->width, viewport->height);
+    }
+};
+
+struct SetScissor {
+    Command command;
+    Rect* viewport;
+    bool enable;
+
+    static const uint32_t TYPE = SET_SCISSOR0;
+
+    static void create(CommandBuffer* commandBuffer, int index, bool enable, Rect* viewport) {
+        SetScissor* setScissor = getCommand<SetScissor>(commandBuffer);
+        setScissor->command.id += index;
+        setScissor->viewport = viewport;
+        setScissor->enable = enable;
+    }
+
+    static void submit(Device& device, SetScissor* cmd) {
+        int index = cmd->command.id - SET_SCISSOR0;
+        Rect* viewport = cmd->viewport;
+
+        if(cmd->enable) {
+            glEnable(GL_SCISSOR_TEST);
+            glScissorIndexed(index, viewport->x, viewport->y, viewport->width, viewport->height);
+        } else {
+            glEnable(GL_SCISSOR_TEST);
+        }
     }
 };
 
@@ -235,17 +285,16 @@ struct SetCullFace {
 struct SetBlend {
     Command command;
     bool enable;
-    int index;
     int equation;
     int src;
     int dst;
 
-    static const uint32_t TYPE = SET_BLEND;
+    static const uint32_t TYPE = SET_BLEND0;
 
     static void create(CommandBuffer* commandBuffer, bool enable, int index, int equation, int src, int dst) {
         SetBlend* setBlend = getCommand<SetBlend>(commandBuffer);
+        setBlend->command.id += index;
         setBlend->enable = enable;
-        setBlend->index = index;
         setBlend->equation = equation;
         setBlend->src = src;
         setBlend->dst = dst;
@@ -256,12 +305,13 @@ struct SetBlend {
     }
 
     static void submit(Device& device, SetBlend* cmd) {
+        int index = cmd->command.id - SET_BLEND0;
         if(cmd->enable) {
-            glEnablei(GL_BLEND, cmd->index);
-            glBlendEquationSeparatei(cmd->index, cmd->equation, cmd->equation); CHECK_ERROR;
-            glBlendFuncSeparatei(cmd->index, cmd->src, cmd->dst, cmd->src, cmd->dst); CHECK_ERROR;
+            glEnablei(GL_BLEND, index);
+            glBlendEquationSeparatei(index, cmd->equation, cmd->equation); CHECK_ERROR;
+            glBlendFuncSeparatei(index, cmd->src, cmd->dst, cmd->src, cmd->dst); CHECK_ERROR;
         } else {
-            glDisablei(GL_BLEND, cmd->index);
+            glDisablei(GL_BLEND, index);
         }
     }
 };
@@ -336,43 +386,26 @@ struct BindProgram {
     }
 };
 
-struct BindSampler {
-    Command command;
-    Program program;
-    Sampler sampler;
-    int unit;
-
-    static const uint32_t TYPE = BIND_SAMPLER;
-
-    static void create(CommandBuffer* commandBuffer, Program program, Sampler sampler, int unit) {
-        BindSampler* bindSampler = getCommand<BindSampler>(commandBuffer);
-        bindSampler->program = program;
-        bindSampler->sampler = sampler;
-        bindSampler->unit = unit;
-    }
-
-    static void submit(Device& device, BindSampler* cmd) {
-        device.bindSampler(cmd->sampler, cmd->unit);
-    }
-};
-
 struct BindTexture {
     Command command;
     Program program;
     Texture2D texture;
+    Sampler sampler;
 
     static const uint32_t TYPE = BIND_TEXTURE0;
 
-    static void create(CommandBuffer* commandBuffer, Program program, Texture2D texture, int unit) {
+    static void create(CommandBuffer* commandBuffer, Program program, Texture2D texture, Sampler sampler, int unit) {
         BindTexture* bindTexture = getCommand<BindTexture>(commandBuffer);
         bindTexture->command.id += unit;
         bindTexture->program = program;
         bindTexture->texture = texture;
+        bindTexture->sampler = sampler;
     }
 
     static void submit(Device& device, BindTexture* cmd) {
         int unit = cmd->command.id - BIND_TEXTURE0;
         device.bindTexture(cmd->program, cmd->texture, unit);
+        device.bindSampler(cmd->sampler, unit);
     }
 };
 
@@ -420,12 +453,31 @@ const FnSubmitCommand submitCommand[] = {
         [CLEAR_COLOR0] = FnSubmitCommand(ClearColor::submit),
         [CLEAR_COLOR1] = FnSubmitCommand(ClearColor::submit),
         [CLEAR_COLOR2] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR3] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR4] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR5] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR6] = FnSubmitCommand(ClearColor::submit),
+        [CLEAR_COLOR7] = FnSubmitCommand(ClearColor::submit),
         [CLEAR_DEPTH_STENCIL] = FnSubmitCommand(ClearDepthStencil::submit),
         [BIND_FRAMEBUFFER] = FnSubmitCommand(BindFramebuffer::submit),
-        [SET_VIEWPORT] = FnSubmitCommand(SetViewport::submit),
+        [SET_VIEWPORT0] = FnSubmitCommand(SetViewport::submit),
+        [SET_VIEWPORT1] = FnSubmitCommand(SetViewport::submit),
+        [SET_VIEWPORT2] = FnSubmitCommand(SetViewport::submit),
+        [SET_VIEWPORT3] = FnSubmitCommand(SetViewport::submit),
+        [SET_SCISSOR0] = FnSubmitCommand(SetScissor::submit),
+        [SET_SCISSOR1] = FnSubmitCommand(SetScissor::submit),
+        [SET_SCISSOR2] = FnSubmitCommand(SetScissor::submit),
+        [SET_SCISSOR3] = FnSubmitCommand(SetScissor::submit),
         [SET_DEPTH_TEST] = FnSubmitCommand(SetDepthTest::submit),
         [SET_CULL_FACE] = FnSubmitCommand(SetCullFace::submit),
-        [SET_BLEND] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND0] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND1] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND2] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND3] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND4] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND5] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND6] = FnSubmitCommand(SetBlend::submit),
+        [SET_BLEND7] = FnSubmitCommand(SetBlend::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
         [BIND_CONSTANT_BUFFER] = FnSubmitCommand(BindConstantBuffer::submit),
         [BIND_VERTEX_ARRAY] = FnSubmitCommand(BindVertexArray::submit),
@@ -433,7 +485,11 @@ const FnSubmitCommand submitCommand[] = {
         [BIND_TEXTURE0] = FnSubmitCommand(BindTexture::submit),
         [BIND_TEXTURE1] = FnSubmitCommand(BindTexture::submit),
         [BIND_TEXTURE2] = FnSubmitCommand(BindTexture::submit),
-        [BIND_SAMPLER] = FnSubmitCommand(BindSampler::submit),
+        [BIND_TEXTURE3] = FnSubmitCommand(BindTexture::submit),
+        [BIND_TEXTURE4] = FnSubmitCommand(BindTexture::submit),
+        [BIND_TEXTURE5] = FnSubmitCommand(BindTexture::submit),
+        [BIND_TEXTURE6] = FnSubmitCommand(BindTexture::submit),
+        [BIND_TEXTURE7] = FnSubmitCommand(BindTexture::submit),
 };
 
 const int sizeCommand[] = {
@@ -442,12 +498,31 @@ const int sizeCommand[] = {
         [CLEAR_COLOR0] = sizeof(ClearColor),
         [CLEAR_COLOR1] = sizeof(ClearColor),
         [CLEAR_COLOR2] = sizeof(ClearColor),
+        [CLEAR_COLOR3] = sizeof(ClearColor),
+        [CLEAR_COLOR4] = sizeof(ClearColor),
+        [CLEAR_COLOR5] = sizeof(ClearColor),
+        [CLEAR_COLOR6] = sizeof(ClearColor),
+        [CLEAR_COLOR7] = sizeof(ClearColor),
         [CLEAR_DEPTH_STENCIL] = sizeof(ClearDepthStencil),
         [BIND_FRAMEBUFFER] = sizeof(BindFramebuffer),
-        [SET_VIEWPORT] = sizeof(SetViewport),
+        [SET_VIEWPORT0] = sizeof(SetViewport),
+        [SET_VIEWPORT1] = sizeof(SetViewport),
+        [SET_VIEWPORT2] = sizeof(SetViewport),
+        [SET_VIEWPORT3] = sizeof(SetViewport),
+        [SET_SCISSOR0] = sizeof(SetScissor),
+        [SET_SCISSOR1] = sizeof(SetScissor),
+        [SET_SCISSOR2] = sizeof(SetScissor),
+        [SET_SCISSOR3] = sizeof(SetScissor),
         [SET_DEPTH_TEST] = sizeof(SetDepthTest),
         [SET_CULL_FACE] = sizeof(SetCullFace),
-        [SET_BLEND] = sizeof(SetBlend),
+        [SET_BLEND0] = sizeof(SetBlend),
+        [SET_BLEND1] = sizeof(SetBlend),
+        [SET_BLEND2] = sizeof(SetBlend),
+        [SET_BLEND3] = sizeof(SetBlend),
+        [SET_BLEND4] = sizeof(SetBlend),
+        [SET_BLEND5] = sizeof(SetBlend),
+        [SET_BLEND6] = sizeof(SetBlend),
+        [SET_BLEND7] = sizeof(SetBlend),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
         [BIND_CONSTANT_BUFFER] = sizeof(BindConstantBuffer),
         [BIND_VERTEX_ARRAY] = sizeof(BindVertexArray),
@@ -455,7 +530,11 @@ const int sizeCommand[] = {
         [BIND_TEXTURE0] = sizeof(BindTexture),
         [BIND_TEXTURE1] = sizeof(BindTexture),
         [BIND_TEXTURE2] = sizeof(BindTexture),
-        [BIND_SAMPLER] = sizeof(BindSampler),
+        [BIND_TEXTURE3] = sizeof(BindTexture),
+        [BIND_TEXTURE4] = sizeof(BindTexture),
+        [BIND_TEXTURE5] = sizeof(BindTexture),
+        [BIND_TEXTURE6] = sizeof(BindTexture),
+        [BIND_TEXTURE7] = sizeof(BindTexture),
 };
 
 #endif //COMMANDS_H

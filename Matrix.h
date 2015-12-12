@@ -5,7 +5,7 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
-#define RIGHT_HANDED 0
+#define RIGHT_HANDED 1
 #define ZERO_TO_ONE 0
 
 #if RIGHT_HANDED

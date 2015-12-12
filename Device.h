@@ -54,11 +54,11 @@ struct Renderbuffer {
     GLuint id;
 };
 
-struct Viewport {
-    int x;
-    int y;
-    int width;
-    int height;
+struct Rect {
+    float x;
+    float y;
+    float width;
+    float height;
 };
 
 struct VertexFormat {
@@ -171,6 +171,14 @@ public:
     void setConstantBufferBindingPoint(Program program, const char* blockName, int bindingPoint) {
         int index = glGetUniformBlockIndex(program.id, blockName);
         glUniformBlockBinding(program.id, index, bindingPoint); CHECK_ERROR;
+    }
+
+    void setTextureBindingPoint(Program program, const char* name, int bindingPoint) {
+        int index = glGetUniformLocation(program.id, name);
+        if (index != -1) {
+            glUseProgram(program.id);
+            glUniform1i(index, bindingPoint);
+        }
     }
 
     VertexArray createVertexArray(const VertexDeclaration* vertexDeclarations, int size,
@@ -672,10 +680,6 @@ public:
         glUseProgram(program.id); CHECK_ERROR;
     }
 
-    int getUniformLocation(Program program, const char* name) {
-        return glGetUniformLocation(program.id, name);
-    }
-
     void copyConstantBuffer(ConstantBuffer constantBuffer, const void* data, size_t size) {
         glBindBuffer(GL_UNIFORM_BUFFER, constantBuffer.id); CHECK_ERROR;
         glBufferSubData(GL_UNIFORM_BUFFER, 0, size, data); CHECK_ERROR;
@@ -683,7 +687,6 @@ public:
 
     void bindTexture(Program program, Texture2D texture, int unit) {
         glActiveTexture(GL_TEXTURE0 + unit); CHECK_ERROR;
-        glUniform1i(unit, unit); CHECK_ERROR;
         glBindTexture(GL_TEXTURE_2D, texture.id); CHECK_ERROR;
     }
 
@@ -720,7 +723,6 @@ public:
         glBufferSubData(GL_ARRAY_BUFFER, offset, size, data); CHECK_ERROR;
         glBindBuffer(GL_ARRAY_BUFFER, 0); CHECK_ERROR;
     }
-
 private:
     uint32_t vertexBufferCount;
     uint32_t indexBufferCount;

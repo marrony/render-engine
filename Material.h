@@ -44,13 +44,11 @@ struct Material {
         SetBlend::disable(material->state, 2);
 
         if(diffuse->mainUnit != -1) {
-            BindTexture::create(material->state, diffuse->program, diffuse->mainTex, diffuse->mainUnit);
-            BindSampler::create(material->state, diffuse->program, diffuse->mainSampler, diffuse->mainUnit);
+            BindTexture::create(material->state, diffuse->program, diffuse->mainTex, diffuse->mainSampler, diffuse->mainUnit);
         }
 
         if(diffuse->bumpUnit != -1) {
-            BindTexture::create(material->state, diffuse->program, diffuse->bumpMap, diffuse->bumpUnit);
-            BindSampler::create(material->state, diffuse->program, diffuse->bumpSampler, diffuse->bumpUnit);
+            BindTexture::create(material->state, diffuse->program, diffuse->bumpMap, diffuse->bumpSampler, diffuse->bumpUnit);
         }
 
         return material;
@@ -69,13 +67,11 @@ struct Material {
         SetBlend::create(material->state, true, 0, GL_FUNC_ADD, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         if(transparency->mainUnit != -1) {
-            BindTexture::create(material->state, transparency->program, transparency->mainTex, transparency->mainUnit);
-            BindSampler::create(material->state, transparency->program, transparency->mainSampler, transparency->mainUnit);
+            BindTexture::create(material->state, transparency->program, transparency->mainTex, transparency->mainSampler, transparency->mainUnit);
         }
 
         if(transparency->bumpUnit != -1) {
-            BindTexture::create(material->state, transparency->program, transparency->bumpMap, transparency->bumpUnit);
-            BindSampler::create(material->state, transparency->program, transparency->bumpSampler, transparency->bumpUnit);
+            BindTexture::create(material->state, transparency->program, transparency->bumpMap, transparency->bumpSampler, transparency->bumpUnit);
         }
 
         return material;

@@ -5,6 +5,8 @@
 #ifndef TGAREADER_H
 #define TGAREADER_H
 
+#include <stdio.h>
+
 /*
  A TGA file has a header that consists of 12 fields. These are:
  # 0x00 - 0x00 - id (uchar)

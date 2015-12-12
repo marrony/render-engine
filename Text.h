@@ -102,7 +102,8 @@ public:
         Sampler sampler = {0};
         device.bindSampler(sampler, 0);
 
-        int in_Sampler = device.getUniformLocation(program, "in_Sampler");
+        int in_Sampler = 0;
+        device.setTextureBindingPoint(program, "in_Sampler", in_Sampler);
 
         FontFace* font = fonts[fontId.id];
 
