@@ -72,7 +72,7 @@ public:
         device.destroyProgram(program);
     }
 
-    void printText(Font fontId, float x, float y, const char* fmt, ...) {
+    void printText(Font fontId, Framebuffer framebuffer, float x, float y, const char* fmt, ...) {
         char text[1024];
 
         va_list list;
@@ -91,11 +91,13 @@ public:
         GLFWwindow* window = glfwGetCurrentContext();
         glfwGetFramebufferSize(window, &width, &height);
 
+        device.bindDrawFramebuffer(framebuffer);
         glViewport(0, 0, width, height);
 
         float invw = 1.0f / width;
         float invh = 1.0f / height;
 
+        glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 

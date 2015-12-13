@@ -430,6 +430,7 @@ public:
 
         const char* geometrySource2[] = {
                 "#version 410 core\n",
+                "#define GEOMETRY_SHADER\n",
                 commonSource,
                 geometrySource
         };
@@ -438,7 +439,7 @@ public:
 
         if(geometrySource != nullptr) {
             geometryShader = glCreateShader(GL_GEOMETRY_SHADER); CHECK_ERROR;
-            glShaderSource(geometryShader, 3, geometrySource2, nullptr); CHECK_ERROR;
+            glShaderSource(geometryShader, 4, geometrySource2, nullptr); CHECK_ERROR;
             glCompileShader(geometryShader); CHECK_ERROR;
             glGetShaderiv(geometryShader, GL_COMPILE_STATUS, &status);
             if (!status) {
@@ -452,12 +453,13 @@ public:
 
         const char* vertexSource2[] = {
                 "#version 410 core\n",
+                "#define VERTEX_SHADER\n",
                 commonSource,
                 vertexSource
         };
 
         GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER); CHECK_ERROR;
-        glShaderSource(vertexShader, 3, vertexSource2, nullptr); CHECK_ERROR;
+        glShaderSource(vertexShader, 4, vertexSource2, nullptr); CHECK_ERROR;
         glCompileShader(vertexShader); CHECK_ERROR;
         glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
         if (!status) {
@@ -470,12 +472,13 @@ public:
 
         const char* fragmentSource2[] = {
                 "#version 410 core\n",
+                "#define FRAGMENT_SHADER\n",
                 commonSource,
                 fragmentSource
         };
 
         GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER); CHECK_ERROR;
-        glShaderSource(fragmentShader, 3, fragmentSource2, nullptr); CHECK_ERROR;
+        glShaderSource(fragmentShader, 4, fragmentSource2, nullptr); CHECK_ERROR;
         glCompileShader(fragmentShader); CHECK_ERROR;
         glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
         if (!status) {

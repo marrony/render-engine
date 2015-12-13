@@ -229,18 +229,18 @@ int main(int argc, char* argv[]) {
 
     Model* sphereModel = modelManager.createSphere("sphere01", 1.0, 20);
 
-    ModelInstance* modelInstance0 = modelManager.createModelInstance(sphereModel, 4, sphere4Instances, in_sphere4Instances, 4 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance0 = modelManager.createModelInstance(sphereModel, 4, sphere4Instances, BINDING_POINT_INSTANCE_DATA, in_sphere4Instances, 4 * sizeof(In_InstanceData));
     ModelInstance::setMaterial(modelInstance0, 0, diffuseMaterial);
 
-    ModelInstance* modelInstance1 = modelManager.createModelInstance(sphereModel, 2, sphere2Instances, in_sphere2Instances, 2 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(sphereModel, 2, sphere2Instances, BINDING_POINT_INSTANCE_DATA, in_sphere2Instances, 2 * sizeof(In_InstanceData));
     ModelInstance::setMaterial(modelInstance1, 0, transparentMaterial);
 
     Model* quadModel = modelManager.createQuad("quad");
 
-    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, plane1Instance, in_plane1Instance, 1 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, plane1Instance, BINDING_POINT_INSTANCE_DATA, in_plane1Instance, 1 * sizeof(In_InstanceData));
     ModelInstance::setMaterial(modelInstance2, 0, backgroundMaterial);
 
-    ModelInstance* modelInstance3 = modelManager.createModelInstance(quadModel, 1, planeTranspInstance, in_planeTranspInstance, 1 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance3 = modelManager.createModelInstance(quadModel, 1, planeTranspInstance, BINDING_POINT_INSTANCE_DATA, in_planeTranspInstance, 1 * sizeof(In_InstanceData));
     ModelInstance::setMaterial(modelInstance3, 0, transparentMaterial);
 
     modelManager.destroyModel(sphereModel);
@@ -285,9 +285,9 @@ int main(int argc, char* argv[]) {
     Program quadProgram = device.createProgram(commonSource, quadVertexSource, quadFragmentSource, quadGeometrySource);
     Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
 
-    device.setTextureBindingPoint(quadProgram, "in_Position", 0);
-    device.setTextureBindingPoint(quadProgram, "in_Normal", 1);
-    device.setTextureBindingPoint(quadProgram, "in_Albedo", 2);
+    device.setTextureBindingPoint(quadProgram, "in_Buffer0", 0);
+    device.setTextureBindingPoint(quadProgram, "in_Buffer1", 1);
+    device.setTextureBindingPoint(quadProgram, "in_Buffer2", 2);
 
     device.setTextureBindingPoint(copyProgram, "in_Texture", 0);
 
@@ -316,7 +316,6 @@ int main(int argc, char* argv[]) {
     In_LightData lightData[3] = {};
     ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(In_LightData));
 
-    Framebuffer nullFramebuffer = {0};
     CommandBuffer* drawQuadLight = CommandBuffer::create(heapAllocator, 20);
     BindFramebuffer::create(drawQuadLight, transparentBuffer);
     SetViewport::create(drawQuadLight, 0, &gBufferViewport);
@@ -358,6 +357,7 @@ int main(int argc, char* argv[]) {
     ModelInstance::draw(modelInstance3, 5, renderQueue, drawTransparent);
 
     //todo change to glBlitFramebuffer?
+    Framebuffer nullFramebuffer = {0};
     CommandBuffer* copyCommand = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(copyCommand, nullFramebuffer);
     SetDepthTest::disable(copyCommand);
@@ -410,7 +410,7 @@ int main(int argc, char* argv[]) {
         mnMatrix4Identity(in_frameData.view.values);
 
         float fov = 45.0f * M_PI / 180.0f;
-        float aspect = viewport.width / (float)viewport.height;
+        float aspect = viewport.width / viewport.height;
         switch (projection) {
         case PERSPECTIVE:
             mnMatrix4Perspective(fov, aspect, 0.001, 10, in_frameData.projection.values);
@@ -475,6 +475,22 @@ int main(int argc, char* argv[]) {
 
         CommandBuffer::execute(commandBuffer, device);
 
+#if 0
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, transparentBuffer.id); CHECK_ERROR;
+//        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.id); CHECK_ERROR;
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); CHECK_ERROR;
+
+        glBlitFramebuffer(
+                0, 0, wgbuffer, hgbuffer,
+                0, 0, viewport.width, viewport.height,
+                GL_COLOR_BUFFER_BIT,
+                GL_NEAREST
+        );
+
+        CHECK_ERROR;
+#endif
+
         const char* str;
 
         switch (projection) {
@@ -490,14 +506,14 @@ int main(int argc, char* argv[]) {
         }
 
 
-        textManager.printText(fontItalic, 10, 280, "Projection: %s", str);
-        textManager.printText(fontItalic, 10, 230, "Fps: %d Angle: %f", fps2, angle);
-        textManager.printText(fontRegular, 10, 180, "viewport: %.2f %.2f %.2f %.2f", viewport.x, viewport.y, viewport.width, viewport.height);
-        textManager.printText(fontRegular, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
+        textManager.printText(fontItalic, nullFramebuffer, 10, 280, "Projection: %s", str);
+        textManager.printText(fontItalic, nullFramebuffer, 10, 230, "Fps: %d Angle: %f", fps2, angle);
+        textManager.printText(fontRegular, nullFramebuffer, 10, 180, "viewport: %.2f %.2f %.2f %.2f", viewport.x, viewport.y, viewport.width, viewport.height);
+        textManager.printText(fontRegular, nullFramebuffer, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
-        textManager.printText(fontRegular, 10, 80, "Executed commands %d | %.2f%% executed",
+        textManager.printText(fontRegular, nullFramebuffer, 10, 80, "Executed commands %d | %.2f%% executed",
                               renderQueue.getExecutedCommands(), renderQueue.getExecutedCommands() / totalCommands * 100);
-        textManager.printText(fontRegular, 10, 30, "Skipped commands %d | %.2f%% ignored",
+        textManager.printText(fontRegular, nullFramebuffer, 10, 30, "Skipped commands %d | %.2f%% ignored",
                               renderQueue.getSkippedCommands(), renderQueue.getSkippedCommands() / totalCommands * 100);
 
         glfwSwapBuffers(window);
