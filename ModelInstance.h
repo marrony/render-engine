@@ -23,15 +23,17 @@ struct ModelInstance {
             Material* material = modelInstance->perMesh[i].material;
             CommandBuffer* draw = modelInstance->perMesh[i].draw;
 
-            CommandBuffer* commandBuffers[] = {
-                    globalState,
-                    modelInstance->state,
-                    model->state,
-                    material->state,
-                    draw,
-            };
+            for (int j = 0; j < material->passCount; j++) {
+                CommandBuffer* commandBuffers[] = {
+                        globalState,
+                        modelInstance->state,
+                        model->state,
+                        material->state[j],
+                        draw,
+                };
 
-            renderQueue.submit(key, commandBuffers, 5);
+                renderQueue.submit(key, commandBuffers, 5);
+            }
         }
     }
 

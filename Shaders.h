@@ -230,7 +230,7 @@ vec4 getPosition() {
 }
 
 float getAlpha() {
-    return 0.3;
+    return 0.4;
 }
 
 void main() {

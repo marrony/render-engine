@@ -338,7 +338,6 @@ int main(int argc, char* argv[]) {
 #else
     SetDepthTest::create(drawTransparent, true, GL_GEQUAL);
 #endif
-    SetCullFace::disable(drawTransparent);
     BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
     CopyConstantBuffer::create(drawTransparent, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(drawTransparent, frameDataBuffer, BINDING_POINT_FRAME_DATA);
