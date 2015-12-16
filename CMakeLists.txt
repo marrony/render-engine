@@ -22,9 +22,12 @@ link_directories(${GLFW_STATIC_LIBRARY_DIRS})
 include_directories(${FREETYPE_INCLUDE_DIRS})
 link_directories(${FREETYPE_STATIC_LIBRARY_DIRS})
 
-set(SOURCE_FILES main.cpp gl3w/src/gl3w.c)
+set(SOURCE_FILES main.cpp Device.cpp Text.cpp gl3w/src/gl3w.c)
 add_executable(render_engine ${SOURCE_FILES})
 target_link_libraries(render_engine ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES} ${FOUNDATION_LIBRARY})
+
+add_executable(dual_depth_peeling dual_depth_peeling.cpp Device.cpp Text.cpp gl3w/src/gl3w.c)
+target_link_libraries(dual_depth_peeling ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES} ${FOUNDATION_LIBRARY})
 
 add_custom_command(TARGET render_engine PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory

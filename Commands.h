@@ -10,8 +10,17 @@
 enum CommandType {
     DRAW_TRIANGLES = 0,
     DRAW_TRIANGLES_INSTANCED,
-    DRAW_COMMANDS_MAX = DRAW_TRIANGLES_INSTANCED,
-    BIND_FRAMEBUFFER,
+    CLEAR_COLOR0,
+    CLEAR_COLOR1,
+    CLEAR_COLOR2,
+    CLEAR_COLOR3,
+    CLEAR_COLOR4,
+    CLEAR_COLOR5,
+    CLEAR_COLOR6,
+    CLEAR_COLOR7,
+    CLEAR_DEPTH_STENCIL,
+    COPY_CONSTANT_BUFFER,
+    DIRECT_COMMANDS_MAX = COPY_CONSTANT_BUFFER,
     SET_VIEWPORT0,
     SET_VIEWPORT1,
     SET_VIEWPORT2,
@@ -30,17 +39,9 @@ enum CommandType {
     SET_BLEND5,
     SET_BLEND6,
     SET_BLEND7,
-    CLEAR_COLOR0,
-    CLEAR_COLOR1,
-    CLEAR_COLOR2,
-    CLEAR_COLOR3,
-    CLEAR_COLOR4,
-    CLEAR_COLOR5,
-    CLEAR_COLOR6,
-    CLEAR_COLOR7,
-    CLEAR_DEPTH_STENCIL,
-    COPY_CONSTANT_BUFFER,
+    SET_DRAWBUFFERS,
     BIND_CONSTANT_BUFFER,
+    BIND_FRAMEBUFFER,
     BIND_VERTEX_ARRAY,
     BIND_PROGRAM,
     BIND_TEXTURE0,
@@ -316,6 +317,42 @@ struct SetBlend {
     }
 };
 
+struct SetDrawBuffers {
+    Command command;
+    uint32_t mask;
+
+    static const uint32_t TYPE = SET_DRAWBUFFERS;
+
+    static void create(CommandBuffer* commandBuffer, uint32_t mask) {
+        SetDrawBuffers* setDrawBuffers = getCommand<SetDrawBuffers>(commandBuffer);
+        setDrawBuffers->mask = mask;
+    }
+
+    static void submit(Device& device, SetDrawBuffers* cmd) {
+        uint32_t mask = cmd->mask;
+
+        //todo find a way to change back to default draw buffer
+        if(mask == 0xffffffff) {
+            glDrawBuffer(GL_BACK_LEFT);
+            return;
+        }
+
+        int count = 0;
+        GLenum buffers[32] = {};
+
+        for (int i = 0; i < 32; i++) {
+            if (mask & (1 << i)) {
+                buffers[count] = GL_COLOR_ATTACHMENT0 + i;
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            glDrawBuffers(count, buffers);
+        }
+    }
+};
+
 struct CopyConstantBuffer {
     Command command;
     ConstantBuffer constantBuffer;
@@ -388,23 +425,21 @@ struct BindProgram {
 
 struct BindTexture {
     Command command;
-    Program program;
     Texture2D texture;
     Sampler sampler;
 
     static const uint32_t TYPE = BIND_TEXTURE0;
 
-    static void create(CommandBuffer* commandBuffer, Program program, Texture2D texture, Sampler sampler, int unit) {
+    static void create(CommandBuffer* commandBuffer, Texture2D texture, Sampler sampler, int unit) {
         BindTexture* bindTexture = getCommand<BindTexture>(commandBuffer);
         bindTexture->command.id += unit;
-        bindTexture->program = program;
         bindTexture->texture = texture;
         bindTexture->sampler = sampler;
     }
 
     static void submit(Device& device, BindTexture* cmd) {
         int unit = cmd->command.id - BIND_TEXTURE0;
-        device.bindTexture(cmd->program, cmd->texture, unit);
+        device.bindTexture(cmd->texture, unit);
         device.bindSampler(cmd->sampler, unit);
     }
 };
@@ -478,6 +513,7 @@ const FnSubmitCommand submitCommand[] = {
         [SET_BLEND5] = FnSubmitCommand(SetBlend::submit),
         [SET_BLEND6] = FnSubmitCommand(SetBlend::submit),
         [SET_BLEND7] = FnSubmitCommand(SetBlend::submit),
+        [SET_DRAWBUFFERS] = FnSubmitCommand(SetDrawBuffers::submit),
         [COPY_CONSTANT_BUFFER] = FnSubmitCommand(CopyConstantBuffer::submit),
         [BIND_CONSTANT_BUFFER] = FnSubmitCommand(BindConstantBuffer::submit),
         [BIND_VERTEX_ARRAY] = FnSubmitCommand(BindVertexArray::submit),
@@ -523,6 +559,7 @@ const int sizeCommand[] = {
         [SET_BLEND5] = sizeof(SetBlend),
         [SET_BLEND6] = sizeof(SetBlend),
         [SET_BLEND7] = sizeof(SetBlend),
+        [SET_DRAWBUFFERS] = sizeof(SetDrawBuffers),
         [COPY_CONSTANT_BUFFER] = sizeof(CopyConstantBuffer),
         [BIND_CONSTANT_BUFFER] = sizeof(BindConstantBuffer),
         [BIND_VERTEX_ARRAY] = sizeof(BindVertexArray),

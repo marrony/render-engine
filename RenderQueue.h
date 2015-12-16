@@ -11,7 +11,7 @@
 struct RenderItem {
     uint64_t key;
     int commandBufferCount;
-    CommandBuffer* commandBuffer[COMMAND_MAX];
+    CommandBuffer* commandBuffer[16];
 };
 
 bool operator<(const RenderItem& i0, const RenderItem& i1) {
@@ -103,7 +103,7 @@ private:
 
                     int size = sizeCommand[id];
 
-                    if (isDrawCommand(id) || !previousCmd[id] || memcmp(previousCmd[id], cmd, size) != 0) {
+                    if (isDirectCommand(id) || !previousCmd[id] || memcmp(previousCmd[id], cmd, size) != 0) {
                         execute(cmd);
                         previousCmd[id] = cmd;
                     } else {
@@ -116,8 +116,8 @@ private:
         itemsCount = 0;
     }
 
-    bool isDrawCommand(uint32_t id) {
-        return id <= DRAW_COMMANDS_MAX;
+    bool isDirectCommand(uint32_t id) {
+        return id <= DIRECT_COMMANDS_MAX;
     }
 
     void invoke(Command* cmd) {

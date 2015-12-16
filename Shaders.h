@@ -94,7 +94,7 @@ layout(std140) uniform in_FrameData {
 };
 
 layout(std140) uniform in_InstanceData {
-    InstanceData instanceData[4];
+    InstanceData instanceData[50];
 };
 
 VertexData transformVertex(out vec4 position) {
@@ -164,10 +164,6 @@ void main() {
 
 const char* fragmentSource = STR(
 in VertexData vtx;
-
-layout(std140) uniform in_InstanceData {
-    InstanceData instanceData[4];
-};
 
 uniform sampler2D in_MainTex;
 uniform sampler2D in_BumpMap;

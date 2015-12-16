@@ -8,48 +8,6 @@
 #include <math.h>
 #include <assert.h>
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
-void check_error(const char* file, int line) {
-    switch (glGetError()) {
-        case GL_NO_ERROR:
-            break;
-        case GL_INVALID_ENUM:
-            printf("glError(GL_INVALID_ENUM) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        case GL_INVALID_VALUE:
-            printf("glError(GL_INVALID_VALUE) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        case GL_INVALID_OPERATION:
-            printf("glError(GL_INVALID_OPERATION) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        case GL_INVALID_FRAMEBUFFER_OPERATION:
-            printf("glError(GL_INVALID_FRAMEBUFFER_OPERATION) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        case GL_OUT_OF_MEMORY:
-            printf("glError(GL_OUT_OF_MEMORY) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        case GL_STACK_UNDERFLOW:
-            printf("glError(GL_STACK_UNDERFLOW) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        case GL_STACK_OVERFLOW:
-            printf("glError(GL_STACK_OVERFLOW) = %s:%d\n", file, line);
-            exit(EXIT_FAILURE);
-            break;
-        default:
-            break;
-    }
-}
-
-#define CHECK_ERROR check_error(__FILE__, __LINE__)
-
 #include "Vector.h"
 #include "Matrix.h"
 #include "Allocator.h"
@@ -90,8 +48,10 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
     if (key == GLFW_KEY_1 && action == GLFW_RELEASE)
         projection = PERSPECTIVE;
+
     if (key == GLFW_KEY_2 && action == GLFW_RELEASE)
         projection = PERSPECTIVE_INFINITE;
+
     if (key == GLFW_KEY_3 && action == GLFW_RELEASE)
         projection = ORTHO;
 }
@@ -142,8 +102,32 @@ int main(int argc, char* argv[]) {
     //SeparateProgram vertexProgram = device.createVertexProgram(commonSource, vertexSource);
     //SeparateProgram fragmentProgram = device.createFragmentProgram(commonSource, fragmentSource);
 
+    int BINDING_POINT_INSTANCE_DATA = 0;
+    int BINDING_POINT_FRAME_DATA = 1;
+    int BINDING_POINT_LIGHT_DATA = 2;
+
     Program programOpaque = device.createProgram(commonSource, vertexSource, fragmentSource, nullptr);
     Program programTransparent = device.createProgram(commonSource, vertexTransparencySource, fragmentTransparencySource, nullptr);
+    Program quadProgram = device.createProgram(commonSource, quadVertexSource, quadFragmentSource, quadGeometrySource);
+    Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
+
+    device.setTextureBindingPoint(programOpaque, "in_MainTex", 0);
+    device.setTextureBindingPoint(programOpaque, "in_BumpMap", 1);
+    device.setConstantBufferBindingPoint(programOpaque, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
+    device.setConstantBufferBindingPoint(programOpaque, "in_FrameData", BINDING_POINT_FRAME_DATA);
+
+    device.setTextureBindingPoint(programTransparent, "in_MainTex", 0);
+    device.setTextureBindingPoint(programTransparent, "in_BumpMap", 1);
+    device.setConstantBufferBindingPoint(programTransparent, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
+    device.setConstantBufferBindingPoint(programTransparent, "in_FrameData", BINDING_POINT_FRAME_DATA);
+    device.setConstantBufferBindingPoint(programTransparent, "in_LightData", BINDING_POINT_LIGHT_DATA);
+
+    device.setTextureBindingPoint(quadProgram, "in_Buffer0", 0);
+    device.setTextureBindingPoint(quadProgram, "in_Buffer1", 1);
+    device.setTextureBindingPoint(quadProgram, "in_Buffer2", 2);
+    device.setConstantBufferBindingPoint(quadProgram, "in_LightData", BINDING_POINT_LIGHT_DATA);
+
+    device.setTextureBindingPoint(copyProgram, "in_Texture", 0);
 
     struct In_InstanceData {
         Matrix4 in_Rotation;
@@ -174,9 +158,6 @@ int main(int argc, char* argv[]) {
     Texture2D texture2 = textureManager.loadTexture("images/stained_glass.tga");
     Texture2D texture3 = device.createRGBATexture(2, 2, pixels);
 
-    device.setTextureBindingPoint(programOpaque, "in_MainTex", 0);
-    device.setTextureBindingPoint(programOpaque, "in_BumpMap", 1);
-
     MaterialBumpedDiffuse bumpedDiffuse;
     bumpedDiffuse.program = programOpaque;
     bumpedDiffuse.mainUnit = 0;
@@ -186,9 +167,6 @@ int main(int argc, char* argv[]) {
     bumpedDiffuse.bumpMap = texture1;
     bumpedDiffuse.bumpSampler = textureManager.getNearest();
     Material* diffuseMaterial = Material::create(heapAllocator, &bumpedDiffuse);
-
-    device.setTextureBindingPoint(programTransparent, "in_MainTex", 0);
-    device.setTextureBindingPoint(programTransparent, "in_BumpMap", 1);
 
     MaterialTransparency transparency;
     transparency.program = programTransparent;
@@ -210,16 +188,6 @@ int main(int argc, char* argv[]) {
     bumpedDiffuse2.bumpMap = texture3;
     bumpedDiffuse2.bumpSampler = textureManager.getNearest();
     Material* backgroundMaterial = Material::create(heapAllocator, &bumpedDiffuse2);
-
-    int BINDING_POINT_INSTANCE_DATA = 0;
-    int BINDING_POINT_FRAME_DATA = 1;
-    int BINDING_POINT_LIGHT_DATA = 2;
-
-    device.setConstantBufferBindingPoint(programOpaque, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
-    device.setConstantBufferBindingPoint(programOpaque, "in_FrameData", BINDING_POINT_FRAME_DATA);
-    device.setConstantBufferBindingPoint(programTransparent, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
-    device.setConstantBufferBindingPoint(programTransparent, "in_FrameData", BINDING_POINT_FRAME_DATA);
-    device.setConstantBufferBindingPoint(programTransparent, "in_LightData", BINDING_POINT_LIGHT_DATA);
 
     ConstantBuffer sphere4Instances = device.createConstantBuffer(4 * sizeof(In_InstanceData));
     ConstantBuffer sphere2Instances = device.createConstantBuffer(2 * sizeof(In_InstanceData));
@@ -265,66 +233,36 @@ int main(int argc, char* argv[]) {
     device.bindTextureToFramebuffer(gBuffer, albedo, 2);
     device.bindDepthStencilTextureToFramebuffer(gBuffer, depth);
 
-    if (!device.isFramebufferComplete(gBuffer))
-        return -1;
+    assert(device.isFramebufferComplete(gBuffer));
 
-    int targets[] = { 0, 1, 2 };
-    device.setRenderTarget(gBuffer, targets, 3);
+//    int targets[] = { 0, 1, 2 };
+//    device.setRenderTarget(gBuffer, targets, 3);
 
     Framebuffer transparentBuffer = device.createFramebuffer();
     Texture2D quadTexture = device.createRGBA32FTexture(wgbuffer, hgbuffer, nullptr);
     device.bindTextureToFramebuffer(transparentBuffer, quadTexture, 0);
     device.bindDepthStencilTextureToFramebuffer(transparentBuffer, depth);
 
-    if (!device.isFramebufferComplete(transparentBuffer))
-        return -1;
+    assert(device.isFramebufferComplete(transparentBuffer));
 
-    int quadTarget = 0;
-    device.setRenderTarget(transparentBuffer, &quadTarget, 1);
-
-    Program quadProgram = device.createProgram(commonSource, quadVertexSource, quadFragmentSource, quadGeometrySource);
-    Program copyProgram = device.createProgram(commonSource, quadVertexSource, copyFragmentSource, quadGeometrySource);
-
-    device.setTextureBindingPoint(quadProgram, "in_Buffer0", 0);
-    device.setTextureBindingPoint(quadProgram, "in_Buffer1", 1);
-    device.setTextureBindingPoint(quadProgram, "in_Buffer2", 2);
-
-    device.setTextureBindingPoint(copyProgram, "in_Texture", 0);
+//    int quadTarget = 0;
+//    device.setRenderTarget(transparentBuffer, &quadTarget, 1);
 
     Rect gBufferViewport = {0, 0, (float)wgbuffer, (float)hgbuffer};
-    CommandBuffer* drawGBuffer = CommandBuffer::create(heapAllocator, 11);
-    BindFramebuffer::create(drawGBuffer, gBuffer);
-    SetViewport::create(drawGBuffer, 0, &gBufferViewport);
-    ClearColor::create(drawGBuffer, 0, 0.00, 0.00, 0.00, 1); //position
-    ClearColor::create(drawGBuffer, 1, 0.00, 0.00, 0.00, 1); //normal
-    ClearColor::create(drawGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
-#if RIGHT_HANDED
-    ClearDepthStencil::create(drawGBuffer, 1.0, 0x00);
-    SetDepthTest::create(drawGBuffer, true, GL_LEQUAL);
-    SetCullFace::create(drawGBuffer, true, GL_BACK, GL_CCW);
-#else
-    ClearDepthStencil::create(drawGBuffer, 0.0, 0x00);
-    SetDepthTest::create(drawGBuffer, true, GL_GEQUAL);
-    SetCullFace::create(drawGBuffer, true, GL_BACK, GL_CW);
-    glDepthRange(1, 0);
-#endif
-    CopyConstantBuffer::create(drawGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
-    BindConstantBuffer::create(drawGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
-
-    device.setConstantBufferBindingPoint(quadProgram, "in_LightData", BINDING_POINT_LIGHT_DATA);
 
     In_LightData lightData[3] = {};
     ConstantBuffer lightPosConstantBuffer = device.createConstantBuffer(3 * sizeof(In_LightData));
 
     CommandBuffer* drawQuadLight = CommandBuffer::create(heapAllocator, 20);
     BindFramebuffer::create(drawQuadLight, transparentBuffer);
+    SetDrawBuffers::create(drawQuadLight, 0x1);
     SetViewport::create(drawQuadLight, 0, &gBufferViewport);
     SetDepthTest::disable(drawQuadLight);
     SetCullFace::disable(drawQuadLight);
     BindProgram::create(drawQuadLight, quadProgram);
-    BindTexture::create(drawQuadLight, quadProgram, position, textureManager.getNearest(), 0);
-    BindTexture::create(drawQuadLight, quadProgram, normal, textureManager.getNearest(), 1);
-    BindTexture::create(drawQuadLight, quadProgram, albedo, textureManager.getNearest(), 2);
+    BindTexture::create(drawQuadLight, position, textureManager.getNearest(), 0);
+    BindTexture::create(drawQuadLight, normal, textureManager.getNearest(), 1);
+    BindTexture::create(drawQuadLight, albedo, textureManager.getNearest(), 2);
     CopyConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
     BindConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
     CopyConstantBuffer::create(drawQuadLight, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
@@ -332,6 +270,7 @@ int main(int argc, char* argv[]) {
 
     CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(drawTransparent, transparentBuffer);
+    SetDrawBuffers::create(drawTransparent, 0x1);
     SetViewport::create(drawTransparent, 0, &gBufferViewport);
 #if RIGHT_HANDED
     SetDepthTest::create(drawTransparent, true, GL_LEQUAL);
@@ -344,9 +283,33 @@ int main(int argc, char* argv[]) {
 
     RenderQueue renderQueue(device, heapAllocator);
 
+    CommandBuffer* setupGBuffer = CommandBuffer::create(heapAllocator, 11);
+    BindFramebuffer::create(setupGBuffer, gBuffer);
+    SetDrawBuffers::create(setupGBuffer, 0x7);
+    SetViewport::create(setupGBuffer, 0, &gBufferViewport);
+    ClearColor::create(setupGBuffer, 0, 0.00, 0.00, 0.00, 0); //position
+    ClearColor::create(setupGBuffer, 1, 0.00, 0.00, 0.00, 0); //normal
+    ClearColor::create(setupGBuffer, 2, 0.50, 0.50, 0.50, 0); //albedo
+#if RIGHT_HANDED
+    ClearDepthStencil::create(setupGBuffer, 1.0, 0x00);
+    SetDepthTest::create(setupGBuffer, true, GL_LEQUAL);
+    SetCullFace::create(setupGBuffer, true, GL_BACK, GL_CCW);
+#else
+    ClearDepthStencil::create(setupGBuffer, 0.0, 0x00);
+    SetDepthTest::create(setupGBuffer, true, GL_GEQUAL);
+    SetCullFace::create(setupGBuffer, true, GL_BACK, GL_CW);
+    glDepthRange(1, 0);
+#endif
+    CopyConstantBuffer::create(setupGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+    BindConstantBuffer::create(setupGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
+
+    renderQueue.submit(0, &setupGBuffer, 1);
+
+    CommandBuffer empty = {0};
+
     //deferred shading
-    ModelInstance::draw(modelInstance0, 1, renderQueue, drawGBuffer);
-    ModelInstance::draw(modelInstance2, 2, renderQueue, drawGBuffer);
+    ModelInstance::draw(modelInstance0, 1, renderQueue, &empty);
+    ModelInstance::draw(modelInstance2, 2, renderQueue, &empty);
 
     //light accumulation
     Model::draw(quadModel, 3, renderQueue, drawQuadLight);
@@ -359,11 +322,12 @@ int main(int argc, char* argv[]) {
     Framebuffer nullFramebuffer = {0};
     CommandBuffer* copyCommand = CommandBuffer::create(heapAllocator, 10);
     BindFramebuffer::create(copyCommand, nullFramebuffer);
+    SetDrawBuffers::create(copyCommand, 0xffffffff);
     SetDepthTest::disable(copyCommand);
     SetCullFace::disable(copyCommand);
     SetViewport::create(copyCommand, 0, &viewport);
     BindProgram::create(copyCommand, copyProgram);
-    BindTexture::create(copyCommand, copyProgram, quadTexture, textureManager.getNearest(), 0);
+    BindTexture::create(copyCommand, quadTexture, textureManager.getNearest(), 0);
     Model::draw(quadModel, 10, renderQueue, copyCommand);
 
     CommandBuffer* commandBuffer = renderQueue.sendToCommandBuffer();
@@ -475,9 +439,9 @@ int main(int argc, char* argv[]) {
         CommandBuffer::execute(commandBuffer, device);
 
 #if 0
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, transparentBuffer.id); CHECK_ERROR;
-//        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.id); CHECK_ERROR;
-        glReadBuffer(GL_COLOR_ATTACHMENT0);
+//        glBindFramebuffer(GL_READ_FRAMEBUFFER, transparentBuffer.id); CHECK_ERROR;
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.id); CHECK_ERROR;
+        glReadBuffer(GL_COLOR_ATTACHMENT0); CHECK_ERROR;
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); CHECK_ERROR;
 
         glBlitFramebuffer(
@@ -485,9 +449,7 @@ int main(int argc, char* argv[]) {
                 0, 0, viewport.width, viewport.height,
                 GL_COLOR_BUFFER_BIT,
                 GL_NEAREST
-        );
-
-        CHECK_ERROR;
+        ); CHECK_ERROR;
 #endif
 
         const char* str;
@@ -504,15 +466,14 @@ int main(int argc, char* argv[]) {
             break;
         }
 
-
-        textManager.printText(fontItalic, nullFramebuffer, 10, 280, "Projection: %s", str);
-        textManager.printText(fontItalic, nullFramebuffer, 10, 230, "Fps: %d Angle: %f", fps2, angle);
-        textManager.printText(fontRegular, nullFramebuffer, 10, 180, "viewport: %.2f %.2f %.2f %.2f", viewport.x, viewport.y, viewport.width, viewport.height);
-        textManager.printText(fontRegular, nullFramebuffer, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
+        const float white[3] = {1, 1, 1};
+        textManager.printText(fontItalic, nullFramebuffer, white, 10, 230, "Fps: %d Angle: %f", fps2, angle);
+        textManager.printText(fontRegular, nullFramebuffer, white, 10, 180, "viewport: %.2f %.2f %.2f %.2f", viewport.x, viewport.y, viewport.width, viewport.height);
+        textManager.printText(fontRegular, nullFramebuffer, white, 10, 130, "Memory used %ld bytes", heapAllocator.memoryUsed());
         float totalCommands = renderQueue.getExecutedCommands() + renderQueue.getSkippedCommands();
-        textManager.printText(fontRegular, nullFramebuffer, 10, 80, "Executed commands %d | %.2f%% executed",
+        textManager.printText(fontRegular, nullFramebuffer, white, 10, 80, "Executed commands %d | %.2f%% executed",
                               renderQueue.getExecutedCommands(), renderQueue.getExecutedCommands() / totalCommands * 100);
-        textManager.printText(fontRegular, nullFramebuffer, 10, 30, "Skipped commands %d | %.2f%% ignored",
+        textManager.printText(fontRegular, nullFramebuffer, white, 10, 30, "Skipped commands %d | %.2f%% ignored",
                               renderQueue.getSkippedCommands(), renderQueue.getSkippedCommands() / totalCommands * 100);
 
         glfwSwapBuffers(window);
@@ -522,7 +483,7 @@ int main(int argc, char* argv[]) {
     Material::destroy(heapAllocator, diffuseMaterial);
     Material::destroy(heapAllocator, transparentMaterial);
     Material::destroy(heapAllocator, backgroundMaterial);
-    CommandBuffer::destroy(heapAllocator, drawGBuffer);
+    CommandBuffer::destroy(heapAllocator, setupGBuffer);
     CommandBuffer::destroy(heapAllocator, drawQuadLight);
     CommandBuffer::destroy(heapAllocator, commandBuffer);
     CommandBuffer::destroy(heapAllocator, drawTransparent);

@@ -6,6 +6,7 @@
 #define ALLOCATOR_H
 
 #include <assert.h>
+#include <memory.h>
 
 class LinearAllocator {
 public:

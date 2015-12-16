@@ -37,6 +37,23 @@ struct ModelInstance {
         }
     }
 
+    static void drawNoMaterial(ModelInstance* modelInstance, uint64_t key, RenderQueue& renderQueue, CommandBuffer* globalState) {
+        Model* model = modelInstance->model;
+
+        for (int i = 0; i < model->meshCount; i++) {
+            CommandBuffer* draw = modelInstance->perMesh[i].draw;
+
+            CommandBuffer* commandBuffers[] = {
+                    globalState,
+                    modelInstance->state,
+                    model->state,
+                    draw,
+            };
+
+            renderQueue.submit(key, commandBuffers, 4);
+        }
+    }
+
     static ModelInstance* create(HeapAllocator& allocator, Model* model, ConstantBuffer constantBuffer, int bindingPoint, const void* data, size_t size) {
         return createInstanced(allocator, model, 1, constantBuffer, bindingPoint, data, size);
     }
