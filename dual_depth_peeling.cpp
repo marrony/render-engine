@@ -338,7 +338,7 @@ int main() {
     In_InstanceData instanceData[27];
     In_FrameData frameData;
 
-    ModelInstance* modelInstance = modelManager.createModelInstance(sphereModel, NUMBER_SPHERES, sphere27Instances, BINDING_POINT_INSTANCE_DATA, instanceData, NUMBER_SPHERES * sizeof(In_InstanceData));
+    ModelInstance* modelInstance = modelManager.createModelInstance(sphereModel, NUMBER_SPHERES, sphere27Instances, BINDING_POINT_INSTANCE_DATA);
 
     RenderQueue renderQueue(device, heapAllocator);
 
@@ -388,88 +388,13 @@ int main() {
     device.bindTextureToFramebuffer(dualDepthFbo, colorBlenderTexID, 6);
     assert(device.isFramebufferComplete(dualDepthFbo));
 
-    CommandBuffer* stage1 = CommandBuffer::create(heapAllocator, 100);
+    const int LAYERS = 4;
 
-    CopyConstantBuffer::create(stage1, sphere27Instances, instanceData, sizeof(instanceData));
-    CopyConstantBuffer::create(stage1, frameConstantBuffer, &frameData, sizeof(In_FrameData));
-    BindConstantBuffer::create(stage1, sphere27Instances, BINDING_POINT_INSTANCE_DATA);
-    BindConstantBuffer::create(stage1, frameConstantBuffer, BINDING_POINT_FRAME_DATA);
-
-    BindFramebuffer::create(stage1, {0});
-    SetDrawBuffers::create(stage1, 0xffffffff);
-    ClearColor::create(stage1, 0, 0.0f, 1.0f, 0.0f, 1.0f);
-
-    BindFramebuffer::create(stage1, dualDepthFbo);
-    SetViewport::create(stage1, 0, &dualDepthViewport);
-    SetDrawBuffers::create(stage1, (1 << 1) | (1 << 2));
-    ClearColor::create(stage1, 0, 0.0f, 0.0f, 0.0f, 0.0f);
-    ClearColor::create(stage1, 1, 0.0f, 0.0f, 0.0f, 0.0f);
-    SetDrawBuffers::create(stage1, (1 << 0));
-    ClearColor::create(stage1, 0, -1.0f, -1.0f, 0.0f, 0.0f);
-    SetDepthTest::disable(stage1);
-    SetBlend::create(stage1, true, 0, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    SetBlend::disable(stage1, 1);
-    SetBlend::disable(stage1, 2);
-    BindProgram::create(stage1, initShader);
-
-    ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, stage1);
-
-    CommandBuffer* clearColorBuffer = CommandBuffer::create(heapAllocator, 2);
-    SetDrawBuffers::create(clearColorBuffer, (1 << 6));
-    ClearColor::create(clearColorBuffer, 0, 0.9f, 0.9f, 0.9f, 0);
-    renderQueue.submit(1, &clearColorBuffer, 1);
-
-    CommandBuffer* stage2[5] = {};
-    CommandBuffer* stage3[5] = {};
-
-    int currId = 0;
-    for (int layer = 1; layer < 4; layer++) {
-        currId = layer % 2;
-        int prevId = 1 - currId;
-        int bufId = currId * 3;
-
-        stage2[layer] = CommandBuffer::create(heapAllocator, 100);
-
-        SetDrawBuffers::create(stage2[layer], (1 << bufId) | (1 << (bufId+1)) | (1 << (bufId+2)));
-        ClearColor::create(stage2[layer], 0, -1.0f, -1.0f, 0.0f, 0.0f);
-        ClearColor::create(stage2[layer], 1, 0.0f, 0.0f, 0.0f, 0.0f);
-        ClearColor::create(stage2[layer], 2, 0.0f, 0.0f, 0.0f, 0.0f);
-
-        SetBlend::create(stage2[layer], true, 0, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        SetBlend::create(stage2[layer], true, 1, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        SetBlend::create(stage2[layer], true, 2, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        BindProgram::create(stage2[layer], dualPeelShader);
-        BindTexture::create(stage2[layer], depthTexId[prevId], textureManager.getNearest(), 0);
-        BindTexture::create(stage2[layer], texId[prevId], textureManager.getNearest(), 1);
-
-        ModelInstance::drawNoMaterial(modelInstance, 2*layer+0, renderQueue, stage2[layer]);
-
-        //fullscreen pass
-        stage3[layer] = CommandBuffer::create(heapAllocator, 100);
-        SetDrawBuffers::create(stage3[layer], (1 << 6));
-        SetBlend::create(stage3[layer], true, 0, GL_FUNC_ADD, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        SetBlend::disable(stage3[layer], 1);
-        SetBlend::disable(stage3[layer], 2);
-        BindProgram::create(stage3[layer], blendShader);
-        BindTexture::create(stage3[layer], backTexId[currId], textureManager.getNearest(), 0);
-        Model::draw(quadModel, 2*layer+1, renderQueue, stage3[layer]);
-    }
-
-    CommandBuffer* stage4 = CommandBuffer::create(heapAllocator, 100);
-    BindFramebuffer::create(stage4, {0});
-    SetDrawBuffers::create(stage4, 0xffffffff);
-    SetViewport::create(stage4, 0, &viewport);
-    SetBlend::disable(stage4, 0);
-    SetBlend::disable(stage4, 1);
-    SetBlend::disable(stage4, 2);
-    BindProgram::create(stage4, finalShader);
-    BindTexture::create(stage4, depthTexId[currId], {0}, 0);
-    BindTexture::create(stage4, texId[currId], {0}, 1);
-    BindTexture::create(stage4, colorBlenderTexID, {0}, 2);
-    Model::draw(quadModel, 100, renderQueue, stage4);
-
-    CommandBuffer* backed = renderQueue.sendToCommandBuffer();
+    CommandBuffer* clearColorBuffer = nullptr;
+    CommandBuffer* stage1 = nullptr;
+    CommandBuffer* stage2[LAYERS] = {nullptr};
+    CommandBuffer* stage3[LAYERS] = {nullptr};
+    CommandBuffer* stage4 = nullptr;
 
     double current = glfwGetTime();
     double inc = 0;
@@ -501,7 +426,99 @@ int main() {
         float at[3] = {0, 0, 0};
         mnMatrix4LookAt(eye, at, frameData.view.values);
 
-        CommandBuffer::execute(backed, device);
+        device.copyConstantBuffer(sphere27Instances, instanceData, sizeof(instanceData));
+        device.copyConstantBuffer(frameConstantBuffer, &frameData, sizeof(In_FrameData));
+
+        if (stage1 == nullptr) {
+            stage1 = CommandBuffer::create(heapAllocator, 100);
+            BindConstantBuffer::create(stage1, sphere27Instances, BINDING_POINT_INSTANCE_DATA);
+            BindConstantBuffer::create(stage1, frameConstantBuffer, BINDING_POINT_FRAME_DATA);
+
+            BindFramebuffer::create(stage1, {0});
+            SetDrawBuffers::create(stage1, 0xffffffff);
+            ClearColor::create(stage1, 0, 0.0f, 1.0f, 0.0f, 1.0f);
+
+            BindFramebuffer::create(stage1, dualDepthFbo);
+            SetViewport::create(stage1, 0, &dualDepthViewport);
+            SetDrawBuffers::create(stage1, (1 << 1) | (1 << 2));
+            ClearColor::create(stage1, 0, 0.0f, 0.0f, 0.0f, 0.0f);
+            ClearColor::create(stage1, 1, 0.0f, 0.0f, 0.0f, 0.0f);
+            SetDrawBuffers::create(stage1, (1 << 0));
+            ClearColor::create(stage1, 0, -1.0f, -1.0f, 0.0f, 0.0f);
+            SetDepthTest::disable(stage1);
+            SetBlend::create(stage1, true, 0, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            SetBlend::disable(stage1, 1);
+            SetBlend::disable(stage1, 2);
+            BindProgram::create(stage1, initShader);
+        }
+
+        ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, stage1);
+
+        if(clearColorBuffer == nullptr) {
+            clearColorBuffer = CommandBuffer::create(heapAllocator, 2);
+            SetDrawBuffers::create(clearColorBuffer, (1 << 6));
+            ClearColor::create(clearColorBuffer, 0, 0.9f, 0.9f, 0.9f, 0);
+        }
+
+        renderQueue.submit(1, &clearColorBuffer, 1);
+
+        int currId = 0;
+        for (int layer = 1; layer < LAYERS; layer++) {
+            currId = layer % 2;
+            int prevId = 1 - currId;
+            int bufId = currId * 3;
+
+            if(stage2[layer] == nullptr) {
+                stage2[layer] = CommandBuffer::create(heapAllocator, 100);
+
+                SetDrawBuffers::create(stage2[layer], (1 << bufId) | (1 << (bufId+1)) | (1 << (bufId+2)));
+                ClearColor::create(stage2[layer], 0, -1.0f, -1.0f, 0.0f, 0.0f);
+                ClearColor::create(stage2[layer], 1, 0.0f, 0.0f, 0.0f, 0.0f);
+                ClearColor::create(stage2[layer], 2, 0.0f, 0.0f, 0.0f, 0.0f);
+
+                SetBlend::create(stage2[layer], true, 0, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                SetBlend::create(stage2[layer], true, 1, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                SetBlend::create(stage2[layer], true, 2, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+                BindProgram::create(stage2[layer], dualPeelShader);
+                BindTexture::create(stage2[layer], depthTexId[prevId], textureManager.getNearest(), 0);
+                BindTexture::create(stage2[layer], texId[prevId], textureManager.getNearest(), 1);
+
+            }
+
+            ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, stage2[layer]);
+
+            //fullscreen pass
+            if (stage3[layer] == nullptr) {
+                stage3[layer] = CommandBuffer::create(heapAllocator, 100);
+                SetDrawBuffers::create(stage3[layer], (1 << 6));
+                SetBlend::create(stage3[layer], true, 0, GL_FUNC_ADD, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                SetBlend::disable(stage3[layer], 1);
+                SetBlend::disable(stage3[layer], 2);
+                BindProgram::create(stage3[layer], blendShader);
+                BindTexture::create(stage3[layer], backTexId[currId], textureManager.getNearest(), 0);
+            }
+
+            Model::draw(quadModel, 0, renderQueue, stage3[layer]);
+        }
+
+        if (stage4 == nullptr) {
+            stage4 = CommandBuffer::create(heapAllocator, 100);
+            BindFramebuffer::create(stage4, {0});
+            SetDrawBuffers::create(stage4, 0xffffffff);
+            SetViewport::create(stage4, 0, &viewport);
+            SetBlend::disable(stage4, 0);
+            SetBlend::disable(stage4, 1);
+            SetBlend::disable(stage4, 2);
+            BindProgram::create(stage4, finalShader);
+            BindTexture::create(stage4, depthTexId[currId], {0}, 0);
+            BindTexture::create(stage4, texId[currId], {0}, 1);
+            BindTexture::create(stage4, colorBlenderTexID, {0}, 2);
+        }
+
+        Model::draw(quadModel, 0, renderQueue, stage4);
+
+        renderQueue.sendToDevice();
 
         if (framebufferIndex >= 0 && framebufferIndex <= 6) {
             glBindFramebuffer(GL_READ_FRAMEBUFFER, dualDepthFbo.id); CHECK_ERROR;
@@ -548,16 +565,15 @@ int main() {
 
     CommandBuffer::destroy(heapAllocator, clearColorBuffer);
     CommandBuffer::destroy(heapAllocator, stage1);
-    for(int i = 0; i < 5; i++) {
-        if(stage2[i])
+    for (int i = 0; i < LAYERS; i++) {
+        if (stage2[i])
             CommandBuffer::destroy(heapAllocator, stage2[i]);
     }
-    for(int i = 0; i < 5; i++) {
-        if(stage3[i])
+    for (int i = 0; i < LAYERS; i++) {
+        if (stage3[i])
             CommandBuffer::destroy(heapAllocator, stage3[i]);
     }
     CommandBuffer::destroy(heapAllocator, stage4);
-    CommandBuffer::destroy(heapAllocator, backed);
 
     return 0;
 }

@@ -197,18 +197,18 @@ int main(int argc, char* argv[]) {
 
     Model* sphereModel = modelManager.createSphere("sphere01", 1.0, 20);
 
-    ModelInstance* modelInstance0 = modelManager.createModelInstance(sphereModel, 4, sphere4Instances, BINDING_POINT_INSTANCE_DATA, in_sphere4Instances, 4 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance0 = modelManager.createModelInstance(sphereModel, 4, sphere4Instances, BINDING_POINT_INSTANCE_DATA);
     ModelInstance::setMaterial(modelInstance0, 0, diffuseMaterial);
 
-    ModelInstance* modelInstance1 = modelManager.createModelInstance(sphereModel, 2, sphere2Instances, BINDING_POINT_INSTANCE_DATA, in_sphere2Instances, 2 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance1 = modelManager.createModelInstance(sphereModel, 2, sphere2Instances, BINDING_POINT_INSTANCE_DATA);
     ModelInstance::setMaterial(modelInstance1, 0, transparentMaterial);
 
     Model* quadModel = modelManager.createQuad("quad");
 
-    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, plane1Instance, BINDING_POINT_INSTANCE_DATA, in_plane1Instance, 1 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance2 = modelManager.createModelInstance(quadModel, 1, plane1Instance, BINDING_POINT_INSTANCE_DATA);
     ModelInstance::setMaterial(modelInstance2, 0, backgroundMaterial);
 
-    ModelInstance* modelInstance3 = modelManager.createModelInstance(quadModel, 1, planeTranspInstance, BINDING_POINT_INSTANCE_DATA, in_planeTranspInstance, 1 * sizeof(In_InstanceData));
+    ModelInstance* modelInstance3 = modelManager.createModelInstance(quadModel, 1, planeTranspInstance, BINDING_POINT_INSTANCE_DATA);
     ModelInstance::setMaterial(modelInstance3, 0, transparentMaterial);
 
     modelManager.destroyModel(sphereModel);
@@ -263,9 +263,7 @@ int main(int argc, char* argv[]) {
     BindTexture::create(drawQuadLight, position, textureManager.getNearest(), 0);
     BindTexture::create(drawQuadLight, normal, textureManager.getNearest(), 1);
     BindTexture::create(drawQuadLight, albedo, textureManager.getNearest(), 2);
-    CopyConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
     BindConstantBuffer::create(drawQuadLight, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
-    CopyConstantBuffer::create(drawQuadLight, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(drawQuadLight, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     CommandBuffer* drawTransparent = CommandBuffer::create(heapAllocator, 10);
@@ -278,7 +276,6 @@ int main(int argc, char* argv[]) {
     SetDepthTest::create(drawTransparent, true, GL_GEQUAL);
 #endif
     BindConstantBuffer::create(drawTransparent, lightPosConstantBuffer, BINDING_POINT_LIGHT_DATA);
-    CopyConstantBuffer::create(drawTransparent, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(drawTransparent, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     RenderQueue renderQueue(device, heapAllocator);
@@ -300,7 +297,6 @@ int main(int argc, char* argv[]) {
     SetCullFace::create(setupGBuffer, true, GL_BACK, GL_CW);
     glDepthRange(1, 0);
 #endif
-    CopyConstantBuffer::create(setupGBuffer, frameDataBuffer, &in_frameData, sizeof(In_FrameData));
     BindConstantBuffer::create(setupGBuffer, frameDataBuffer, BINDING_POINT_FRAME_DATA);
 
     renderQueue.submit(0, &setupGBuffer, 1);
@@ -435,6 +431,13 @@ int main(int argc, char* argv[]) {
 //        in_vertexData0.in_Color[0].z -= 0.00003;
 
         angle += 0.005;
+
+        device.copyConstantBuffer(lightPosConstantBuffer, lightData, 3 * sizeof(In_LightData));
+        device.copyConstantBuffer(frameDataBuffer, &in_frameData, sizeof(In_FrameData));
+        device.copyConstantBuffer(sphere4Instances, in_sphere4Instances, 4 * sizeof(In_InstanceData));
+        device.copyConstantBuffer(sphere2Instances, in_sphere2Instances, 2 * sizeof(In_InstanceData));
+        device.copyConstantBuffer(plane1Instance, in_plane1Instance, 1 * sizeof(In_InstanceData));
+        device.copyConstantBuffer(planeTranspInstance, in_planeTranspInstance, 1 * sizeof(In_InstanceData));
 
         CommandBuffer::execute(commandBuffer, device);
 

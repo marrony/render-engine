@@ -8,15 +8,15 @@
 #include <algorithm>
 #include <functional>
 
+#include "Allocator.h"
+#include "Commands.h"
+#include "Device.h"
+
 struct RenderItem {
     uint64_t key;
     int commandBufferCount;
     CommandBuffer* commandBuffer[16];
 };
-
-bool operator<(const RenderItem& i0, const RenderItem& i1) {
-    return i0.key < i1.key;
-}
 
 struct RenderGroup {
     CommandBuffer* commandBuffer;
@@ -26,104 +26,27 @@ struct RenderGroup {
 
 class RenderQueue {
 public:
-    RenderQueue(Device& device, HeapAllocator& allocator)
-            : device(device), allocator(allocator), itemsCount(0) {
-        items = (RenderItem*) allocator.allocate(sizeof(RenderItem) * 1024);
-    }
+    RenderQueue(Device& device, HeapAllocator& allocator);
 
-    ~RenderQueue() {
-        allocator.deallocate(items);
-    }
+    ~RenderQueue();
 
-    void submit(uint64_t key, CommandBuffer** commandBuffer, int commandBufferCount) {
-        items[itemsCount].key = key;
-        for (int i = 0; i < commandBufferCount; i++)
-            items[itemsCount].commandBuffer[i] = commandBuffer[i];
-        items[itemsCount].commandBufferCount = commandBufferCount;
-        itemsCount++;
-    }
+    void submit(uint64_t key, CommandBuffer** commandBuffer, int commandBufferCount);
 
-    CommandBuffer* sendToCommandBuffer() {
-        CommandBuffer* commandBuffer = CommandBuffer::create(allocator, 10);
+    void sort();
 
-        std::function<void(Command*)> exec = [&](Command* src) {
-            if(commandBuffer->commandCount >= commandBuffer->maxCommands) {
-                int maxCommands = commandBuffer->commandCount * 3 / 2;
-                commandBuffer = CommandBuffer::realloc(allocator, commandBuffer, maxCommands);
-            }
+    CommandBuffer* sendToCommandBuffer();
 
-            Command* dst = CommandBuffer::getCommandAt(commandBuffer, commandBuffer->commandCount++);
+    void sendToDevice();
 
-            memcpy(dst, src, COMMAND_MAX_SIZE);
-        };
+    int getSkippedCommands();
 
-        submit(exec);
-
-        return commandBuffer;
-    }
-
-    void sendToDevice() {
-        std::function<void(Command*)> exec = [this](Command* cmd) {
-            invoke(cmd);
-        };
-
-        submit(exec);
-    }
-
-    int getSkippedCommands() {
-        return skippedCommands;
-    }
-
-    int getExecutedCommands() {
-        return executedCommands;
-    }
+    int getExecutedCommands();
 private:
-    void submit(std::function<void(Command*)> execute) {
-        Command* previousCmd[COMMAND_MAX];
+    void submit(std::function<void(Command*)> execute);
 
-        memset(previousCmd, 0, sizeof(previousCmd));
+    bool isDirectCommand(uint32_t id);
 
-        executedCommands = 0;
-        skippedCommands = 0;
-
-        std::sort(items, items+itemsCount);
-
-        for (int i = 0; i < itemsCount; i++) {
-            RenderItem& item = items[i];
-
-            for (int j = 0; j < item.commandBufferCount; j++) {
-                CommandBuffer* commandBuffer = item.commandBuffer[j];
-
-                for (int k = 0; k < commandBuffer->commandCount; k++) {
-                    Command* cmd = CommandBuffer::getCommandAt(commandBuffer, k);
-
-                    extern const int sizeCommand[];
-
-                    uint32_t id = cmd->id;
-
-                    int size = sizeCommand[id];
-
-                    if (isDirectCommand(id) || !previousCmd[id] || memcmp(previousCmd[id], cmd, size) != 0) {
-                        execute(cmd);
-                        previousCmd[id] = cmd;
-                    } else {
-                        skippedCommands++;
-                    }
-                }
-            }
-        }
-
-        itemsCount = 0;
-    }
-
-    bool isDirectCommand(uint32_t id) {
-        return id <= DIRECT_COMMANDS_MAX;
-    }
-
-    void invoke(Command* cmd) {
-        executedCommands++;
-        Command::invoke(cmd, device);
-    }
+    void invoke(Command* cmd);
 
     Device& device;
     HeapAllocator& allocator;

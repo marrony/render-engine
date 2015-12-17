@@ -172,16 +172,16 @@ public:
             destroy(index);
     }
 
-    ModelInstance* createModelInstance(Model* model, int instanceCount, ConstantBuffer constantBuffer, int bindingPoint, void* data, size_t size) {
+    ModelInstance* createModelInstance(Model* model, int instanceCount, ConstantBuffer constantBuffer, int bindingPoint) {
         uint32_t index;
 
         if (findModel(model, index)) {
             models[index].refs++;
 
             if (instanceCount > 1)
-                return ModelInstance::createInstanced(allocator, model, instanceCount, constantBuffer, bindingPoint, data, size);
+                return ModelInstance::createInstanced(allocator, model, instanceCount, constantBuffer, bindingPoint);
 
-            return ModelInstance::create(allocator, model, constantBuffer, bindingPoint, data, size);
+            return ModelInstance::create(allocator, model, constantBuffer, bindingPoint);
         }
 
         return nullptr;

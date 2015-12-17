@@ -5,6 +5,7 @@
 #ifndef ALLOCATOR_H
 #define ALLOCATOR_H
 
+#include <stdio.h>
 #include <assert.h>
 #include <memory.h>
 

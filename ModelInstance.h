@@ -54,17 +54,16 @@ struct ModelInstance {
         }
     }
 
-    static ModelInstance* create(HeapAllocator& allocator, Model* model, ConstantBuffer constantBuffer, int bindingPoint, const void* data, size_t size) {
-        return createInstanced(allocator, model, 1, constantBuffer, bindingPoint, data, size);
+    static ModelInstance* create(HeapAllocator& allocator, Model* model, ConstantBuffer constantBuffer, int bindingPoint) {
+        return createInstanced(allocator, model, 1, constantBuffer, bindingPoint);
     }
 
-    static ModelInstance* createInstanced(HeapAllocator& allocator, Model* model, int instanceCount, ConstantBuffer constantBuffer, int bindingPoint, const void* data, size_t size) {
+    static ModelInstance* createInstanced(HeapAllocator& allocator, Model* model, int instanceCount, ConstantBuffer constantBuffer, int bindingPoint) {
         size_t nbytes = sizeof(ModelInstance) + model->meshCount * sizeof(PerMesh);
 
         ModelInstance* modelInstance = (ModelInstance*) allocator.allocate(nbytes);
 
         modelInstance->state = CommandBuffer::create(allocator, 2);
-        CopyConstantBuffer::create(modelInstance->state, constantBuffer, data, size);
         BindConstantBuffer::create(modelInstance->state, constantBuffer, bindingPoint);
         modelInstance->model = model;
         modelInstance->instanceCount = instanceCount;
