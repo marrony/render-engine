@@ -87,6 +87,46 @@ void mnVector4MulScalar(const float in0[4], const float in1, float out[4]) {
 
 //////////////////////////////////////////////////////////////////////////////
 
+void mnVector2AddScalar(const float in0[2], const float in1, float out[2]) {
+    out[0] = in0[0] + in1;
+    out[1] = in0[1] + in1;
+}
+
+void mnVector3AddScalar(const float in0[3], const float in1, float out[3]) {
+    out[0] = in0[0] + in1;
+    out[1] = in0[1] + in1;
+    out[2] = in0[2] + in1;
+}
+
+void mnVector4AddScalar(const float in0[4], const float in1, float out[4]) {
+    out[0] = in0[0] + in1;
+    out[1] = in0[1] + in1;
+    out[2] = in0[2] + in1;
+    out[3] = in0[3] + in1;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
+void mnVector2SubScalar(const float in0[2], const float in1, float out[2]) {
+    out[0] = in0[0] - in1;
+    out[1] = in0[1] - in1;
+}
+
+void mnVector3SubScalar(const float in0[3], const float in1, float out[3]) {
+    out[0] = in0[0] - in1;
+    out[1] = in0[1] - in1;
+    out[2] = in0[2] - in1;
+}
+
+void mnVector4SubScalar(const float in0[4], const float in1, float out[4]) {
+    out[0] = in0[0] - in1;
+    out[1] = in0[1] - in1;
+    out[2] = in0[2] - in1;
+    out[3] = in0[3] - in1;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+
 void mnVector2MulAddScalar(const float in0[2], const float in1, float out[2]) {
     out[0] += in0[0] * in1;
     out[1] += in0[1] * in1;
