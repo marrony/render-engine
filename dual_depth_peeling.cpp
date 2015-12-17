@@ -109,13 +109,8 @@ out vec4 vColor;
 void main() {
     //get the clipspace vertex position
     gl_Position = projection * view * instanceData[gl_InstanceID].in_Rotation * vec4(in_Position, 1);
+    vColor = instanceData[gl_InstanceID].in_Color;
     fragCoord = in_Texture;
-
-    float r = gl_InstanceID >= 0 && gl_InstanceID < 9 ? 1 : 0;
-    float g = gl_InstanceID >= 9 && gl_InstanceID < 18 ? 1 : 0;
-    float b = gl_InstanceID >= 18 && gl_InstanceID < 27 ? 1 : 0;
-
-    vColor = vec4(r, g, b, 1);
 }
 );
 
@@ -129,8 +124,7 @@ in vec4 vColor;
 
 uniform sampler2D  depthBlenderTex; //depth blending output
 uniform sampler2D  frontBlenderTex; //front blending output
-
-float alpha = 0.5;
+uniform sampler2D  colorTex;
 
 \n#define MAX_DEPTH 1.0\n   //max depth value to clear the depth with
 
@@ -179,12 +173,16 @@ void main() {
 
     //if the fragment depth is the nearest depth, we blend the colour
     //to the second attachment
+    vec3 vColor2 = texture(colorTex, fragCoord).rgb;
+    //vColor2 *= vColor.rgb;
+    float alpha = vColor.a;
+
     if (fragDepth == nearestDepth) {
-        vFragColor1.xyz += vColor.rgb * alpha * alphaMultiplier;
+        vFragColor1.xyz += vColor2.rgb * alpha * alphaMultiplier;
         vFragColor1.w = 1.0 - alphaMultiplier * (1.0 - alpha);
     } else {
         //otherwise we write to the thrid attachment
-        vFragColor2 += vec4(vColor.rgb, alpha);
+        vFragColor2 += vec4(vColor2.rgb, alpha);
     }
 }
 );
@@ -230,18 +228,18 @@ void main() {
     vec4 depthColor = texture(depthBlenderTex, fragCoord.xy);
     vec4 frontColor = texture(frontBlenderTex, fragCoord.xy);
     vec4 backColor = texture(backBlenderTex, fragCoord.xy);
-
-    //vFragColor = vec4(depthColor.rg*0.5 + 0.5, 0, 1);
+    float alphaMultiplier = 1.0 - frontColor.a;
 
     // front + back
     //composite the front and back blending results
-    vFragColor.rgb = frontColor.rgb + backColor.rgb * frontColor.a;
+    //vFragColor.rgb = frontColor.rgb + backColor.rgb * frontColor.a;
+    vFragColor.rgb = frontColor.rgb + backColor.rgb * alphaMultiplier;
 
     // front blender
-    //vFragColor.rgb = frontColor + vec3(alphaMultiplier);
+    //vFragColor.rgb = frontColor.rgb + vec3(alphaMultiplier);
 
     // back blender
-    //vFragColor.rgb = backColor;
+    //vFragColor.rgb = backColor.rgb;
 }
 );
 
@@ -328,12 +326,15 @@ int main() {
 
     device.setTextureBindingPoint(dualPeelShader, "depthBlenderTex", 0);
     device.setTextureBindingPoint(dualPeelShader, "frontBlenderTex", 1);
+    device.setTextureBindingPoint(dualPeelShader, "colorTex", 2);
 
     device.setTextureBindingPoint(blendShader, "tempTexture", 0);
 
     device.setTextureBindingPoint(finalShader, "depthBlenderTex", 0);
     device.setTextureBindingPoint(finalShader, "frontBlenderTex", 1);
     device.setTextureBindingPoint(finalShader, "backBlenderTex", 2);
+
+    Texture2D stained_glass = textureManager.loadTexture("images/stained_glass.tga");
 
     In_InstanceData instanceData[27];
     In_FrameData frameData;
@@ -353,7 +354,20 @@ int main() {
                         1.0f
                 };
                 mnMatrix4Translate(tx, instanceData[index].in_Rotation.values);
-                instanceData[index].in_Color = {1, 1, 1, 1};
+
+                float alpha = 0.5;
+
+#if 1
+                instanceData[index].in_Color = {(float)x, (float)y, (float)z, alpha};
+                mnVector3MulScalar(instanceData[index].in_Color.values, 0.5f, instanceData[index].in_Color.values);
+                mnVector3AddScalar(instanceData[index].in_Color.values, 0.5f, instanceData[index].in_Color.values);
+#else
+                float r = index >= 0 && index < 9 ? 1 : 0;
+                float g = index >= 9 && index < 18 ? 1 : 0;
+                float b = index >= 18 && index < 27 ? 1 : 0;
+                instanceData[index].in_Color = {r, g, b, alpha};
+#endif
+
                 index++;
             }
         }
@@ -362,31 +376,31 @@ int main() {
     const int WIDTH = 1024;
     const int HEIGHT = 768;
 
-    Rect dualDepthViewport = {
+    Rect dualDepthPeelingViewport = {
             0, 0, WIDTH, HEIGHT
     };
 
-    Texture2D texId[2];
+    Texture2D frontTexId[2];
     Texture2D backTexId[2];
     Texture2D depthTexId[2];
 
-    Framebuffer dualDepthFbo = device.createFramebuffer();
+    Framebuffer dualDepthPeelingFbo = device.createFramebuffer();
     for (int i = 0; i < 2; i++) {
         depthTexId[i] = device.createRG32FTexture(WIDTH, HEIGHT, nullptr);
-        texId[i] = device.createRGBAFTexture(WIDTH, HEIGHT, nullptr);
+        frontTexId[i] = device.createRGBAFTexture(WIDTH, HEIGHT, nullptr);
         backTexId[i] = device.createRGBAFTexture(WIDTH, HEIGHT, nullptr);
     }
 
     int attachID[7] = {0, 3};
     for (int i = 0; i < 2; i++) {
-        device.bindTextureToFramebuffer(dualDepthFbo, depthTexId[i], attachID[i] + 0);
-        device.bindTextureToFramebuffer(dualDepthFbo, texId[i], attachID[i] + 1);
-        device.bindTextureToFramebuffer(dualDepthFbo, backTexId[i], attachID[i] + 2);
+        device.bindTextureToFramebuffer(dualDepthPeelingFbo, depthTexId[i], attachID[i] + 0);
+        device.bindTextureToFramebuffer(dualDepthPeelingFbo, frontTexId[i], attachID[i] + 1);
+        device.bindTextureToFramebuffer(dualDepthPeelingFbo, backTexId[i], attachID[i] + 2);
     }
 
-    Texture2D colorBlenderTexID = device.createRGBFTexture(WIDTH, HEIGHT, nullptr);
-    device.bindTextureToFramebuffer(dualDepthFbo, colorBlenderTexID, 6);
-    assert(device.isFramebufferComplete(dualDepthFbo));
+    Texture2D backBlenderTexId = device.createRGBFTexture(WIDTH, HEIGHT, nullptr);
+    device.bindTextureToFramebuffer(dualDepthPeelingFbo, backBlenderTexId, 6);
+    assert(device.isFramebufferComplete(dualDepthPeelingFbo));
 
     const int LAYERS = 4;
 
@@ -429,6 +443,7 @@ int main() {
         device.copyConstantBuffer(sphere27Instances, instanceData, sizeof(instanceData));
         device.copyConstantBuffer(frameConstantBuffer, &frameData, sizeof(In_FrameData));
 
+        //1. Initialize MIN-MAX buffer
         if (stage1 == nullptr) {
             stage1 = CommandBuffer::create(heapAllocator, 100);
             BindConstantBuffer::create(stage1, sphere27Instances, BINDING_POINT_INSTANCE_DATA);
@@ -436,17 +451,17 @@ int main() {
 
             BindFramebuffer::create(stage1, {0});
             SetDrawBuffers::create(stage1, 0xffffffff);
-            ClearColor::create(stage1, 0, 0.0f, 1.0f, 0.0f, 1.0f);
+            ClearColor::create(stage1, 0, 0.0f, 0.0f, 0.0f, 1.0f);
 
-            BindFramebuffer::create(stage1, dualDepthFbo);
-            SetViewport::create(stage1, 0, &dualDepthViewport);
+            BindFramebuffer::create(stage1, dualDepthPeelingFbo);
+            SetViewport::create(stage1, 0, &dualDepthPeelingViewport);
             SetDrawBuffers::create(stage1, (1 << 1) | (1 << 2));
             ClearColor::create(stage1, 0, 0.0f, 0.0f, 0.0f, 0.0f);
             ClearColor::create(stage1, 1, 0.0f, 0.0f, 0.0f, 0.0f);
             SetDrawBuffers::create(stage1, (1 << 0));
             ClearColor::create(stage1, 0, -1.0f, -1.0f, 0.0f, 0.0f);
             SetDepthTest::disable(stage1);
-            SetBlend::create(stage1, true, 0, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            SetBlend::create(stage1, true, 0, GL_MAX, GL_NONE, GL_NONE);
             SetBlend::disable(stage1, 1);
             SetBlend::disable(stage1, 2);
             BindProgram::create(stage1, initShader);
@@ -454,13 +469,18 @@ int main() {
 
         ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, stage1);
 
+        //2. Dual Depth Peeling + Blending
+        const float bg[3] = {0.0f, 0.0f, 0.0f};
         if(clearColorBuffer == nullptr) {
-            clearColorBuffer = CommandBuffer::create(heapAllocator, 2);
+            clearColorBuffer = CommandBuffer::create(heapAllocator, 20);
             SetDrawBuffers::create(clearColorBuffer, (1 << 6));
-            ClearColor::create(clearColorBuffer, 0, 0.9f, 0.9f, 0.9f, 0);
+            ClearColor::create(clearColorBuffer, 0, bg[0], bg[1], bg[2], 0);
+            BindProgram::create(clearColorBuffer, blendShader);
+            BindTexture::create(clearColorBuffer, stained_glass, textureManager.getLinear(), 0);
         }
 
-        renderQueue.submit(1, &clearColorBuffer, 1);
+        Model::draw(quadModel, 0, renderQueue, clearColorBuffer);
+        //renderQueue.submit(0, &clearColorBuffer, 1);
 
         int currId = 0;
         for (int layer = 1; layer < LAYERS; layer++) {
@@ -476,14 +496,14 @@ int main() {
                 ClearColor::create(stage2[layer], 1, 0.0f, 0.0f, 0.0f, 0.0f);
                 ClearColor::create(stage2[layer], 2, 0.0f, 0.0f, 0.0f, 0.0f);
 
-                SetBlend::create(stage2[layer], true, 0, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                SetBlend::create(stage2[layer], true, 1, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                SetBlend::create(stage2[layer], true, 2, GL_MAX, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                SetBlend::create(stage2[layer], true, 0, GL_MAX, GL_NONE, GL_NONE);
+                SetBlend::create(stage2[layer], true, 1, GL_MAX, GL_NONE, GL_NONE);
+                SetBlend::create(stage2[layer], true, 2, GL_MAX, GL_NONE, GL_NONE);
 
                 BindProgram::create(stage2[layer], dualPeelShader);
                 BindTexture::create(stage2[layer], depthTexId[prevId], textureManager.getNearest(), 0);
-                BindTexture::create(stage2[layer], texId[prevId], textureManager.getNearest(), 1);
-
+                BindTexture::create(stage2[layer], frontTexId[prevId], textureManager.getNearest(), 1);
+                BindTexture::create(stage2[layer], stained_glass, textureManager.getLinear(), 2);
             }
 
             ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, stage2[layer]);
@@ -502,6 +522,7 @@ int main() {
             Model::draw(quadModel, 0, renderQueue, stage3[layer]);
         }
 
+        //3. Final pass
         if (stage4 == nullptr) {
             stage4 = CommandBuffer::create(heapAllocator, 100);
             BindFramebuffer::create(stage4, {0});
@@ -512,8 +533,8 @@ int main() {
             SetBlend::disable(stage4, 2);
             BindProgram::create(stage4, finalShader);
             BindTexture::create(stage4, depthTexId[currId], {0}, 0);
-            BindTexture::create(stage4, texId[currId], {0}, 1);
-            BindTexture::create(stage4, colorBlenderTexID, {0}, 2);
+            BindTexture::create(stage4, frontTexId[currId], {0}, 1);
+            BindTexture::create(stage4, backBlenderTexId, {0}, 2);
         }
 
         Model::draw(quadModel, 0, renderQueue, stage4);
@@ -521,7 +542,7 @@ int main() {
         renderQueue.sendToDevice();
 
         if (framebufferIndex >= 0 && framebufferIndex <= 6) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, dualDepthFbo.id); CHECK_ERROR;
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, dualDepthPeelingFbo.id); CHECK_ERROR;
             glReadBuffer(GL_COLOR_ATTACHMENT0 + framebufferIndex); CHECK_ERROR;
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); CHECK_ERROR;
 
@@ -544,16 +565,18 @@ int main() {
     modelManager.destroyModel(quadModel);
     modelManager.destroyModelInstance(modelInstance);
 
+    textureManager.unloadTexture(stained_glass);
+
     device.destroyConstantBuffer(sphere27Instances);
     device.destroyConstantBuffer(frameConstantBuffer);
 
-    device.destroyTexture(texId[0]);
-    device.destroyTexture(texId[1]);
+    device.destroyTexture(frontTexId[0]);
+    device.destroyTexture(frontTexId[1]);
     device.destroyTexture(backTexId[0]);
     device.destroyTexture(backTexId[1]);
     device.destroyTexture(depthTexId[0]);
     device.destroyTexture(depthTexId[1]);
-    device.destroyTexture(colorBlenderTexID);
+    device.destroyTexture(backBlenderTexId);
 
     device.destroyProgram(cubeShader);
     device.destroyProgram(initShader);
@@ -561,7 +584,7 @@ int main() {
     device.destroyProgram(blendShader);
     device.destroyProgram(finalShader);
 
-    device.destroyFramebuffer(dualDepthFbo);
+    device.destroyFramebuffer(dualDepthPeelingFbo);
 
     CommandBuffer::destroy(heapAllocator, clearColorBuffer);
     CommandBuffer::destroy(heapAllocator, stage1);

@@ -47,6 +47,7 @@ public:
         char* tgaPixels;
 
         FILE* stream = fopen(filename, "rb");
+        assert(stream != nullptr);
         readTga(stream, tgaWidth, tgaHeight, tgaFormat, tgaPixels);
         fclose(stream);
 

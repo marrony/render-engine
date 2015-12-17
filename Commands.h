@@ -158,6 +158,10 @@ struct ClearColor {
         clearColor->color[3] = a;
     }
 
+    static void create(CommandBuffer* commandBuffer, int index, const float color[4]) {
+        create(commandBuffer, index, color[0], color[1], color[2], color[3]);
+    }
+
     static void submit(Device& device, ClearColor* cmd) {
         int index = cmd->command.id - CLEAR_COLOR0;
         glClearBufferfv(GL_COLOR, index, cmd->color); CHECK_ERROR;
@@ -289,19 +293,29 @@ struct SetCullFace {
 struct SetBlend {
     Command command;
     bool enable;
-    int equation;
-    int src;
-    int dst;
+    uint16_t equationColor;
+    uint16_t srcColor;
+    uint16_t dstColor;
+    uint16_t equationAlpha;
+    uint16_t srcAlpha;
+    uint16_t dstAlpha;
 
     static const uint32_t TYPE = SET_BLEND0;
 
-    static void create(CommandBuffer* commandBuffer, bool enable, int index, int equation, int src, int dst) {
+    static void create(CommandBuffer* commandBuffer, bool enable, int index, int equationColor, int srcColor, int dstColor, int equationAlpha, int srcAlpha, int dstAlpha) {
         SetBlend* setBlend = getCommand<SetBlend>(commandBuffer);
         setBlend->command.id += index;
         setBlend->enable = enable;
-        setBlend->equation = equation;
-        setBlend->src = src;
-        setBlend->dst = dst;
+        setBlend->equationAlpha = equationAlpha;
+        setBlend->srcColor = srcColor;
+        setBlend->dstColor = dstColor;
+        setBlend->equationColor = equationColor;
+        setBlend->srcAlpha = srcAlpha;
+        setBlend->dstAlpha = dstAlpha;
+    }
+
+    static void create(CommandBuffer* commandBuffer, bool enable, int index, int equation, int src, int dst) {
+        create(commandBuffer, enable, index, equation, src, dst, equation, src, dst);
     }
 
     static void disable(CommandBuffer* commandBuffer, int index) {
@@ -312,8 +326,8 @@ struct SetBlend {
         int index = cmd->command.id - SET_BLEND0;
         if(cmd->enable) {
             glEnablei(GL_BLEND, index);
-            glBlendEquationSeparatei(index, cmd->equation, cmd->equation); CHECK_ERROR;
-            glBlendFuncSeparatei(index, cmd->src, cmd->dst, cmd->src, cmd->dst); CHECK_ERROR;
+            glBlendEquationSeparatei(index, cmd->equationColor, cmd->equationAlpha); CHECK_ERROR;
+            glBlendFuncSeparatei(index, cmd->srcColor, cmd->dstColor, cmd->srcAlpha, cmd->dstAlpha); CHECK_ERROR;
         } else {
             glDisablei(GL_BLEND, index);
         }
