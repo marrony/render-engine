@@ -6,8 +6,9 @@
 #include <GLFW/glfw3.h>
 
 #include <stdio.h>
-#include <memory.h>
 #include <stdlib.h>
+#include <time.h>
+#include <memory.h>
 #include <unistd.h>
 #include <math.h>
 #include <assert.h>
@@ -27,13 +28,29 @@
 Rect viewport = {};
 
 int framebufferIndex = 9;
+float angle = 0;
+bool autoAngle = true;
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 
+    if (!autoAngle && action == GLFW_REPEAT) {
+        switch (key) {
+        case GLFW_KEY_LEFT:
+            angle -= 0.01;
+            break;
+        case GLFW_KEY_RIGHT:
+            angle += 0.01;
+            break;
+        }
+    }
+
     if (action == GLFW_RELEASE) {
         switch (key) {
+        case GLFW_KEY_SPACE:
+            autoAngle = !autoAngle;
+            break;
         case GLFW_KEY_0:
             framebufferIndex = 0;
             break;
@@ -171,12 +188,12 @@ void main() {
     // therefore, we need to shade it, and make sure it is not peeled any farther
     vFragColor0.xy = vec2(-MAX_DEPTH);
 
-    //if the fragment depth is the nearest depth, we blend the colour
-    //to the second attachment
     vec3 vColor2 = texture(colorTex, fragCoord).rgb;
     //vColor2 *= vColor.rgb;
     float alpha = vColor.a;
 
+    //if the fragment depth is the nearest depth, we blend the colour
+    //to the second attachment
     if (fragDepth == nearestDepth) {
         vFragColor1.xyz += vColor2.rgb * alpha * alphaMultiplier;
         vFragColor1.w = 1.0 - alphaMultiplier * (1.0 - alpha);
@@ -285,8 +302,7 @@ int main() {
     TextureManager textureManager(heapAllocator, device);
     TextManager textManager(heapAllocator, device);
 
-    Font fontRegular = textManager.loadFont("./fonts/OpenSans-Regular.ttf", 48);
-    Font fontItalic = textManager.loadFont("./fonts/OpenSans-Italic.ttf", 48);
+    Font fontRegular = textManager.loadFont("./fonts/OpenSans-Bold.ttf", 96);
 
     int BINDING_POINT_INSTANCE_DATA = 0;
     int BINDING_POINT_FRAME_DATA = 1;
@@ -343,6 +359,8 @@ int main() {
 
     RenderQueue renderQueue(device, heapAllocator);
 
+    srand(time(nullptr));
+
     int index = 0;
     for(int x = -1; x <= 1; x++) {
         for(int y = -1; y <= 1; y++) {
@@ -353,9 +371,15 @@ int main() {
                         (float)z * 2.5f,
                         1.0f
                 };
-                mnMatrix4Translate(tx, instanceData[index].in_Rotation.values);
+                float axis[3] = {1, 0, 0};
+                float sc[] = {1, 1, 1};
+                mnMatrix4Transformation(axis, M_PI * (rand() / (float)RAND_MAX), tx, sc, instanceData[index].in_Rotation.values);
 
+#if 1
+                float alpha = ((rand() % 9) / 10.0f) + 1.0/10.0;
+#else
                 float alpha = 0.5;
+#endif
 
 #if 1
                 instanceData[index].in_Color = {(float)x, (float)y, (float)z, alpha};
@@ -415,7 +439,6 @@ int main() {
     int fps = 0;
     int fps2 = 0;
 
-    float angle = 0;
     while (!glfwWindowShouldClose(window)) {
         double c = glfwGetTime();
         double d = c - current;
@@ -423,13 +446,15 @@ int main() {
         current = c;
         fps++;
 
-        if(inc > 1) {
+        if (inc > 1) {
             fps2 = fps;
             fps = 0;
             inc = 0;
         }
 
-        angle += 0.1 * d;
+        if (autoAngle) {
+            angle += 0.1 * d;
+        }
 
         float fov = 45 * M_PI / 180.0f;
         float aspect = viewport.width / viewport.height;
@@ -479,8 +504,8 @@ int main() {
             BindTexture::create(clearColorBuffer, stained_glass, textureManager.getLinear(), 0);
         }
 
-        Model::draw(quadModel, 0, renderQueue, clearColorBuffer);
-        //renderQueue.submit(0, &clearColorBuffer, 1);
+        //Model::draw(quadModel, 0, renderQueue, clearColorBuffer);
+        renderQueue.submit(0, &clearColorBuffer, 1);
 
         int currId = 0;
         for (int layer = 1; layer < LAYERS; layer++) {
@@ -555,7 +580,7 @@ int main() {
         }
 
         const float color[3] = {1, 1, 1};
-        textManager.printText(fontRegular, {0}, color, 10, 20, "Dual Depth Peeling");
+        textManager.printText(fontRegular, {0}, color, 10, 30, "Dual Depth Peeling");
 
         glfwSwapBuffers(window);
         glfwPollEvents();
