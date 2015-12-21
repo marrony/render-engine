@@ -272,19 +272,14 @@ Texture2D Device::createRG32FTexture(int width, int height, const void* pixels) 
     return createTexture(textureCount, GL_RG32F, width, height, GL_RGB, GL_FLOAT, pixels);
 }
 
-DepthStencilTexture Device::createDepthStencilTexture(int width, int height) {
-    TextureBinder binder;
+DepthTexture Device::createDepth32FTexture(int width, int height) {
+    Texture2D texture = createTexture(textureCount, GL_DEPTH_COMPONENT32F, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    return {texture.id};
+}
 
-    GLuint texId;
-    glGenTextures(1, &texId); CHECK_ERROR;
-
-    glBindTexture(GL_TEXTURE_2D, texId); CHECK_ERROR;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0,
-                 GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr); CHECK_ERROR;
-
-    textureCount++;
-
-    return {texId};
+DepthStencilTexture Device::createDepth24Stencil8Texture(int width, int height) {
+    Texture2D texture = createTexture(textureCount, GL_DEPTH24_STENCIL8, width, height, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
+    return {texture.id};
 }
 
 SeparateProgram Device::createVertexProgram(const char* commonSource, const char* source) {
@@ -536,6 +531,12 @@ void Device::destroyFramebuffer(Framebuffer framebuffer) {
 void Device::bindTextureToFramebuffer(Framebuffer framebuffer, Texture2D texture, int index) {
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + index, GL_TEXTURE_2D, texture.id, 0); CHECK_ERROR;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Device::bindDepthTextureToFramebuffer(Framebuffer framebuffer, DepthTexture texture) {
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.id); CHECK_ERROR;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture.id, 0); CHECK_ERROR;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 

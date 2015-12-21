@@ -226,7 +226,7 @@ int main(int argc, char* argv[]) {
     Texture2D position = device.createRGB32FTexture(wgbuffer, hgbuffer, nullptr);
     Texture2D normal = device.createRGB32FTexture(wgbuffer, hgbuffer, nullptr);
     Texture2D albedo = device.createRGBATexture(wgbuffer, hgbuffer, nullptr);
-    DepthStencilTexture depth = device.createDepthStencilTexture(wgbuffer, hgbuffer);
+    DepthStencilTexture depth = device.createDepth24Stencil8Texture(wgbuffer, hgbuffer);
 
     device.bindTextureToFramebuffer(gBuffer, position, 0);
     device.bindTextureToFramebuffer(gBuffer, normal, 1);

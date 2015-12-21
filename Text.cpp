@@ -93,6 +93,7 @@ void TextManager::printText(Font fontId, Framebuffer framebuffer, const float co
     float invw = 1.0f / width;
     float invh = 1.0f / height;
 
+    glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendEquation(GL_FUNC_ADD);

@@ -28,6 +28,11 @@ struct TextureCube {
     GLuint id;
 };
 
+union DepthTexture {
+    GLuint id;
+    Texture2D texture;
+};
+
 union DepthStencilTexture {
     GLuint id;
     Texture2D texture;
@@ -131,7 +136,9 @@ public:
 
     Texture2D createRG32FTexture(int width, int height, const void* pixels);
 
-    DepthStencilTexture createDepthStencilTexture(int width, int height);
+    DepthTexture createDepth32FTexture(int width, int height);
+
+    DepthStencilTexture createDepth24Stencil8Texture(int width, int height);
 
     SeparateProgram createVertexProgram(const char* commonSource, const char* source);
 
@@ -168,6 +175,8 @@ public:
     //////////////////////////////////////////////////
 
     void bindTextureToFramebuffer(Framebuffer framebuffer, Texture2D texture, int index);
+
+    void bindDepthTextureToFramebuffer(Framebuffer framebuffer, DepthTexture texture);
 
     void bindDepthStencilTextureToFramebuffer(Framebuffer framebuffer, DepthStencilTexture texture);
 
