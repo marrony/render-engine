@@ -5,6 +5,13 @@
 #ifndef TEXTURE_MANAGER_H
 #define TEXTURE_MANAGER_H
 
+struct Image {
+    int width;
+    int height;
+    int format;
+    char* pixels;
+};
+
 #include "TgaReader.h"
 
 class TextureManager {
@@ -43,19 +50,30 @@ public:
 
         index = textureCount++;
 
-        int tgaWidth, tgaHeight, tgaFormat;
-        char* tgaPixels;
+        Image tgaImage;
 
         FILE* stream = fopen(filename, "rb");
         assert(stream != nullptr);
-        readTga(stream, tgaWidth, tgaHeight, tgaFormat, tgaPixels);
+        readTga(allocator, stream, tgaImage);
         fclose(stream);
+
+        assert(tgaImage.format == 1 || tgaImage.format == 3 || tgaImage.format == 4);
 
         textures[index].refs = 1;
         textures[index].filename = filename;
-        textures[index].texture = device.createRGBTexture(tgaWidth, tgaHeight, tgaPixels);
+        switch(tgaImage.format) {
+        case 1:
+            textures[index].texture = device.createRTexture(tgaImage.width, tgaImage.height, tgaImage.pixels);
+            break;
+        case 3:
+            textures[index].texture = device.createRGBTexture(tgaImage.width, tgaImage.height, tgaImage.pixels);
+            break;
+        case 4:
+            textures[index].texture = device.createRGBATexture(tgaImage.width, tgaImage.height, tgaImage.pixels);
+            break;
+        }
 
-        delete[] tgaPixels;
+        allocator.deallocate(tgaImage.pixels);
 
         return textures[index].texture;
     }

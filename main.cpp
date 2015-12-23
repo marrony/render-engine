@@ -384,7 +384,8 @@ int main(int argc, char* argv[]) {
 
         float eye[3] = {sinf(angle)*2.5f, 0, cosf(angle)*2.5f};
         float center[3] = {0, 0, 0};
-        mnMatrix4LookAt(eye, center, in_frameData.view.values);
+        float up[3] = {0, 1, 0};
+        mnMatrix4LookAt(eye, center, up, in_frameData.view.values);
 
         float axisX[3] = {1, 0, 0};
         float axisY[3] = {0, 1, 0};

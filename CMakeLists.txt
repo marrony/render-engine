@@ -22,7 +22,7 @@ link_directories(${GLFW_STATIC_LIBRARY_DIRS})
 include_directories(${FREETYPE_INCLUDE_DIRS})
 link_directories(${FREETYPE_STATIC_LIBRARY_DIRS})
 
-set(COMMON_SOURCE_FILES Commands.cpp Device.cpp RenderQueue.cpp Text.cpp gl3w/src/gl3w.c)
+set(COMMON_SOURCE_FILES Commands.cpp Device.cpp RenderQueue.cpp Text.cpp Wavefront.cpp gl3w/src/gl3w.c)
 
 add_executable(render_engine main.cpp ${COMMON_SOURCE_FILES})
 target_link_libraries(render_engine ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES} ${FOUNDATION_LIBRARY})
@@ -33,10 +33,14 @@ target_link_libraries(dual_depth_peeling ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES}
 add_executable(subsurface_scattering subsurface_scattering.cpp ${COMMON_SOURCE_FILES})
 target_link_libraries(subsurface_scattering ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES} ${FOUNDATION_LIBRARY})
 
-add_custom_command(TARGET render_engine PRE_BUILD
+add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/fonts $<TARGET_FILE_DIR:render_engine>/fonts)
 
-add_custom_command(TARGET render_engine PRE_BUILD
+add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/images $<TARGET_FILE_DIR:render_engine>/images)
+
+add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+                   ${CMAKE_SOURCE_DIR}/models $<TARGET_FILE_DIR:render_engine>/models)

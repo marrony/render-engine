@@ -24,6 +24,7 @@
 #include "ModelManager.h"
 #include "TextureManager.h"
 #include "Shaders.h"
+#include "Wavefront.h"
 
 Rect viewport = {};
 
@@ -125,8 +126,10 @@ void main() {
 const char* depth_shader_vert = STR(
 out float dist;
 
+const float grow = 50;
+
 void main() {
-    vec3 position = in_Position + in_Normal*0.05;
+    vec3 position = in_Position + in_Normal*grow;
 
     gl_Position = projection * view * instanceData[gl_InstanceID].in_Rotation * vec4(position, 1);
 
@@ -208,11 +211,22 @@ float scatterTint(float x, float scatterWidth) {
 
 const float u_wrap = 1; //0..1
 const float u_scatterWidth = 1;
-const float u_shininess = 40;
+const float u_shininess = 60;
 
 const vec4 u_diffuseColor = vec4(0.8, 0.0, 0.0, 1.0);
 const vec4 u_scatterColor = vec4(0.15, 0.0, 0.0, 1.0);
 const vec4 u_specularColor = vec4(0.8, 0.8, 0.0, 1.0);
+
+vec2 getDiffuseSpecularFactors(vec3 N, vec3 L, vec3 H, float shininess) {
+    float NdotL = max(0, dot(N, L));
+    float NdotH = dot(N, H);
+
+    float specular = pow(NdotH, shininess);
+    if(NdotL <= 0)
+        specular = 0;
+
+    return vec2(NdotL, specular);
+}
 
 vec4 skinLut(vec2 p, vec3 scatterColor) {
     float NdotL = p.x * 2.0 - 1.0;
@@ -229,7 +243,7 @@ vec4 skinLut(vec2 p, vec3 scatterColor) {
     return vec4(diffuse + scatter * scatterColor, specular);
 }
 
-vec3 shadeSkin(vec3 N, vec3 L, vec3 H, vec3 diffuseColor, vec3 specularColor, vec3 scatterColor) {
+vec3 shadeSkin(vec3 N, vec3 L, vec3 H, vec3 diffuseColor, vec3 scatterColor, vec3 specularColor) {
     float NdotL = dot(N, L);
     float NdotH = dot(N, H);
     vec2 p = vec2(NdotL, NdotH);
@@ -238,7 +252,7 @@ vec3 shadeSkin(vec3 N, vec3 L, vec3 H, vec3 diffuseColor, vec3 specularColor, ve
     return diffuseColor * light.rgb + specularColor * light.a;
 }
 
-const float u_scatterFalloff = 0.9;
+const float u_scatterFalloff = 2.0;
 
 float trace() {
     vec3 proj = texCoord.xyz / texCoord.www;
@@ -260,9 +274,15 @@ void main() {
     vec3 H = normalize(L + V);
     vec3 R = reflect(-V, N);
 
+    float NdotL = dot(N, L);
+    float NdotH = dot(N, H);
+    vec2 p = vec2(NdotL, NdotH);
+
+    vec2 factors = getDiffuseSpecularFactors(N, L, H, 60);
+
     fragColor.rgb = vec3(0);
-    fragColor.rgb += sss(vec3(1, 0, 0));
-//    fragColor.rgb += shadeSkin(N, L, H, vec3(1, 1, 1), vec3(0, 0, 0), vec3(1, 0, 0));
+    fragColor.rgb += sss(vec3(1.0, 0.5, 0.13)) + factors.y*vec3(0.9, 0.9, 0.9);
+//    fragColor.rgb += shadeSkin(N, L, H, vec3(229, 96, 96)/255.0, vec3(0.15, 0, 0), vec3(0, 0, 0));
 }
 );
 
@@ -309,17 +329,17 @@ int main() {
     TextManager textManager(heapAllocator, device);
 
     Font fontRegular = textManager.loadFont("./fonts/OpenSans-Bold.ttf", 96);
-    Texture2D lion = textureManager.loadTexture("images/stained_glass.tga");
 
     const int BINDING_POINT_INSTANCE_DATA = 0;
     const int BINDING_POINT_FRAME_DATA = 1;
     const int BINDING_POINT_DEPTH_DATA = 2;
-    const int NUMBER_SPHERES = 5;
+    const int NUMBER_SPHERES = 4;
     const int WIDTH = 1024;
     const int HEIGHT = 1024;
 
     Model* sphereModel = modelManager.createSphere("sphere01", 1.0, 20);
     Model* quadModel = modelManager.createQuad("quad");
+    Model* wavefront = modelManager.loadWavefront("models/venus.obj");
 
     struct In_InstanceData {
         Matrix4 in_Rotation;
@@ -339,7 +359,7 @@ int main() {
     In_FrameData frameData;
     In_FrameData depthData;
 
-    ModelInstance* modelInstance = modelManager.createModelInstance(sphereModel, NUMBER_SPHERES, sphere4Instances, BINDING_POINT_INSTANCE_DATA);
+    ModelInstance* modelInstance = modelManager.createModelInstance(wavefront, NUMBER_SPHERES, sphere4Instances, BINDING_POINT_INSTANCE_DATA);
 
     Program depthShader = device.createProgram(commonSource, depth_shader_vert, depth_shader_frag, nullptr);
     Program subsurfaceShader = device.createProgram(commonSource, subsurface_shader_vert, subsurface_shader_frag, nullptr);
@@ -359,21 +379,21 @@ int main() {
     Rect depthViewport = {0, 0, WIDTH, HEIGHT};
 
     Texture2D depthTexture = device.createRG32FTexture(WIDTH, HEIGHT, nullptr);
-    Texture2D color = device.createRGBATexture(WIDTH, HEIGHT, nullptr);
+    Texture2D debugTexture = device.createRGBATexture(WIDTH, HEIGHT, nullptr);
     Framebuffer depthFramebuffer = device.createFramebuffer();
 
     device.bindTextureToFramebuffer(depthFramebuffer, depthTexture, 0);
-    device.bindTextureToFramebuffer(depthFramebuffer, color, 1);
+    device.bindTextureToFramebuffer(depthFramebuffer, debugTexture, 1);
     assert(device.isFramebufferComplete(depthFramebuffer));
 
-    float sc[3] = {.6, 1, 1};
+    float sc[3] = {.001, .001, .001};
     Matrix4 scale;
     mnMatrix4Scale(sc, scale.values);
 
-    float tx0[3] = {+.4, 0, 0};
-    float tx1[3] = {-.4, 0, 0};
-    float tx2[3] = {0, 1, +.2};
-    float tx3[3] = {0, 1, -.2};
+    float tx0[3] = {0, -1, -3};
+    float tx1[3] = {0, -1, -1};
+    float tx2[3] = {0, -1, +1};
+    float tx3[3] = {0, -1, +3};
     mnMatrix4Translate(tx0, instanceData[0].in_Rotation.values);
     mnMatrix4Mul(instanceData[0].in_Rotation.values, scale.values, instanceData[0].in_Rotation.values);
     mnMatrix4Translate(tx1, instanceData[1].in_Rotation.values);
@@ -383,7 +403,9 @@ int main() {
     mnMatrix4Translate(tx3, instanceData[3].in_Rotation.values);
     mnMatrix4Mul(instanceData[3].in_Rotation.values, scale.values, instanceData[3].in_Rotation.values);
 
+    CommandBuffer* depthPassCommon = nullptr;
     CommandBuffer* depthPass = nullptr;
+    CommandBuffer* scenePassCommon = nullptr;
     CommandBuffer* scenePass = nullptr;
     CommandBuffer* quadPass = nullptr;
 
@@ -393,6 +415,8 @@ int main() {
     double inc = 0;
     int fps = 0;
     int fps2 = 0;
+
+    float angleLight = 0;
 
     while (!glfwWindowShouldClose(window)) {
         double c = glfwGetTime();
@@ -407,86 +431,98 @@ int main() {
             inc = 0;
         }
 
+        angleLight += 0.3 * d;
         if (autoAngle) {
             angle += 0.3 * d;
         }
 
         float aspect = viewport.width / viewport.height;
         float at[3] = {0, 0, 0};
-        float eye[3] = {cosf(angle)*10, 0, sinf(angle)*10};
-        mnMatrix4Perspective(45 * M_PI / 180.0, aspect, 0.01, 30, frameData.projection.values);
-        mnMatrix4LookAt(eye, at, frameData.view.values);
+        float eye[3] = {cosf(angle)*8, 3, sinf(angle)*8};
+        float upCam[3] = {0, 1, 0};
+        mnMatrix4Perspective(55 * M_PI / 180.0, aspect, 0.01, 30, frameData.projection.values);
+        mnMatrix4LookAt(eye, at, upCam, frameData.view.values);
 
-        float depthFar = 10;
+        float depthFar = 20;
+#if 0
+        float light[3] = {cosf(angleLight)*8, sinf(angleLight)*8, 0};
+        float upLight[3] = {-sinf(angleLight), cosf(angleLight), 0};
+#else
         float light[3] = {8, 0, 0};
-        mnMatrix4Perspective(45 * M_PI / 180.0, (float)WIDTH / (float)HEIGHT, 0.5, depthFar, depthData.projection.values);
-        mnMatrix4LookAt(light, at, depthData.view.values);
-
-        float sc2[3] = {0.1, 0.1, 0.1};
-        mnMatrix4Scale(sc2, scale.values);
-        mnMatrix4Translate(light, instanceData[4].in_Rotation.values);
-        mnMatrix4Mul(instanceData[4].in_Rotation.values, scale.values, instanceData[4].in_Rotation.values);
+        float upLight[3] = {0, 1, 0};
+#endif
+        mnMatrix4Perspective(55 * M_PI / 180.0, (float)WIDTH / (float)HEIGHT, 0.01, depthFar, depthData.projection.values);
+        mnMatrix4LookAt(light, at, upLight, depthData.view.values);
 
         device.copyConstantBuffer(sphere4Instances, instanceData, sizeof(instanceData));
         device.copyConstantBuffer(frameConstantBuffer, &frameData, sizeof(In_FrameData));
         device.copyConstantBuffer(depthConstantBuffer, &depthData, sizeof(In_FrameData));
 
+        if (depthPassCommon == nullptr) {
+            depthPassCommon = CommandBuffer::create(heapAllocator, 100);
+
+            BindConstantBuffer::create(depthPassCommon, sphere4Instances, BINDING_POINT_INSTANCE_DATA);
+            BindConstantBuffer::create(depthPassCommon, depthConstantBuffer, BINDING_POINT_FRAME_DATA);
+
+            BindFramebuffer::create(depthPassCommon, depthFramebuffer);
+            SetDrawBuffers::create(depthPassCommon, (1 << 0) | (1 << 1));
+            SetViewport::create(depthPassCommon, 0, &depthViewport);
+
+            ClearColor::create(depthPassCommon, 0, depthFar, depthFar, 0, 0);
+            ClearColor::create(depthPassCommon, 1, 0, 0, 0, 1);
+
+            SetDepthTest::disable(depthPassCommon);
+
+            SetBlend::create(depthPassCommon, true, 0, GL_MIN, GL_NONE, GL_NONE);
+            SetBlend::disable(depthPassCommon, 1);
+
+            SetCullFace::disable(depthPassCommon);
+        }
+
         if (depthPass == nullptr) {
-            depthPass = CommandBuffer::create(heapAllocator, 100);
+            depthPass = CommandBuffer::create(heapAllocator, 10);
 
-            BindConstantBuffer::create(depthPass, sphere4Instances, BINDING_POINT_INSTANCE_DATA);
-            BindConstantBuffer::create(depthPass, depthConstantBuffer, BINDING_POINT_FRAME_DATA);
-
-            BindFramebuffer::create(depthPass, depthFramebuffer);
-            SetDrawBuffers::create(depthPass, (1 << 0) | (1 << 1));
-            SetViewport::create(depthPass, 0, &depthViewport);
-
-            ClearColor::create(depthPass, 0, depthFar, depthFar, 0, 0);
-            ClearColor::create(depthPass, 1, 0, 0, 0, 1);
-
-            SetDepthTest::disable(depthPass);
-
-            SetBlend::create(depthPass, true, 0, GL_MIN, GL_NONE, GL_NONE);
-            SetBlend::disable(depthPass, 1);
-
-            SetCullFace::disable(depthPass);
             BindProgram::create(depthPass, depthShader);
         }
 
+        renderQueue.submit(0, &depthPassCommon, 1);
         ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, depthPass);
 
-        if (scenePass == nullptr) {
-            scenePass = CommandBuffer::create(heapAllocator, 100);
+        if (scenePassCommon == nullptr) {
+            scenePassCommon = CommandBuffer::create(heapAllocator, 100);
 
             //BindConstantBuffer::create(scenePass, sphere4Instances, BINDING_POINT_INSTANCE_DATA);
-            BindConstantBuffer::create(scenePass, frameConstantBuffer, BINDING_POINT_FRAME_DATA);
-            BindConstantBuffer::create(scenePass, depthConstantBuffer, BINDING_POINT_DEPTH_DATA);
+            BindConstantBuffer::create(scenePassCommon, frameConstantBuffer, BINDING_POINT_FRAME_DATA);
+            BindConstantBuffer::create(scenePassCommon, depthConstantBuffer, BINDING_POINT_DEPTH_DATA);
 
-            BindFramebuffer::create(scenePass, {0});
-            SetDrawBuffers::create(scenePass, 0xffffffff);
-            SetViewport::create(scenePass, 0, &viewport);
-            ClearColor::create(scenePass, 0, 0.0, 0.0, 0.0, 1);
-            SetBlend::disable(scenePass, 0);
+            BindFramebuffer::create(scenePassCommon, {0});
+            SetDrawBuffers::create(scenePassCommon, 0xffffffff);
+            SetViewport::create(scenePassCommon, 0, &viewport);
+            ClearColor::create(scenePassCommon, 0, 0.0, 0.0, 0.0, 1);
+            SetBlend::disable(scenePassCommon, 0);
 
 #if RIGHT_HANDED
-            ClearDepthStencil::create(scenePass, 1.0, 0x00);
-            SetDepthTest::create(scenePass, true, GL_LEQUAL);
-            SetCullFace::create(scenePass, true, GL_BACK, GL_CCW);
+            ClearDepthStencil::create(scenePassCommon, 1.0, 0x00);
+            SetDepthTest::create(scenePassCommon, true, GL_LEQUAL);
+            SetCullFace::create(scenePassCommon, true, GL_BACK, GL_CCW);
 #else
-            ClearDepthStencil::create(scenePass, 0.0, 0x00);
-            SetDepthTest::create(scenePass, true, GL_GEQUAL);
-            SetCullFace::create(scenePass, true, GL_BACK, GL_CW);
+            ClearDepthStencil::create(scenePassCommon, 0.0, 0x00);
+            SetDepthTest::create(scenePassCommon, true, GL_GEQUAL);
+            SetCullFace::create(scenePassCommon, true, GL_BACK, GL_CW);
             glDepthRange(1, 0);
 #endif
+        }
+
+        if (scenePass == nullptr) {
+            scenePass = CommandBuffer::create(heapAllocator, 10);
 
             BindProgram::create(scenePass, subsurfaceShader);
-//            BindTexture::create(scenePass, lion, {0}, 0);
             BindTexture::create(scenePass, depthTexture, {0}, 0);
         }
 
+        renderQueue.submit(0, &scenePassCommon, 1);
         ModelInstance::drawNoMaterial(modelInstance, 0, renderQueue, scenePass);
 
-#if 0
         if (quadPass == nullptr) {
             quadPass = CommandBuffer::create(heapAllocator, 100);
 
@@ -502,6 +538,7 @@ int main() {
             BindTexture::create(quadPass, depthTexture, {0}, 0);
         }
 
+#if 0
         Model::draw(quadModel, 0, renderQueue, quadPass);
 #endif
 
@@ -527,4 +564,28 @@ int main() {
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    modelManager.destroyModel(sphereModel);
+    modelManager.destroyModel(quadModel);
+    modelManager.destroyModel(wavefront);
+
+    modelManager.destroyModelInstance(modelInstance);
+
+    device.destroyConstantBuffer(sphere4Instances);
+    device.destroyConstantBuffer(frameConstantBuffer);
+    device.destroyConstantBuffer(depthConstantBuffer);
+
+    device.destroyTexture(depthTexture);
+    device.destroyTexture(debugTexture);
+    device.destroyFramebuffer(depthFramebuffer);
+
+    device.destroyProgram(depthShader);
+    device.destroyProgram(subsurfaceShader);
+    device.destroyProgram(drawTexture);
+
+    heapAllocator.deallocate(depthPassCommon);
+    heapAllocator.deallocate(depthPass);
+    heapAllocator.deallocate(scenePassCommon);
+    heapAllocator.deallocate(scenePass);
+    heapAllocator.deallocate(quadPass);
 }

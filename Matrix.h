@@ -426,14 +426,15 @@ void mnMatrix4InfinitePerspectiveLH(float fovy, float aspect, float znear, float
 
 //////////////////////////////////////////////////////////////////////////////
 
-void mnMatrix4LookAtRH(const float eye[3], const float at[3], float out[16]) {
-    const float up[3] = {0, 1, 0};
+void mnMatrix4LookAtRH(const float eye[3], const float at[3], const float up[3], float out[16]) {
     float s[3], u[3], f[3];
 
     mnVector3Sub(eye, at, f);
     mnVector3Normalize(f, f);
 
     mnVector3Cross(up, f, s);
+    mnVector3Normalize(s, s);
+
     mnVector3Cross(f, s, u);
 
     float tx = -mnVector3Dot(s, eye);
@@ -446,14 +447,15 @@ void mnMatrix4LookAtRH(const float eye[3], const float at[3], float out[16]) {
     out[3] = 0;     out[7] = 0;     out[11] = 0;     out[15] = 1;
 }
 
-void mnMatrix4LookAtLH(const float eye[3], const float at[3], float out[16]) {
-    const float up[3] = {0, 1, 0};
+void mnMatrix4LookAtLH(const float eye[3], const float at[3], const float up[3], float out[16]) {
     float s[3], u[3], f[3];
 
     mnVector3Sub(at, eye, f);
     mnVector3Normalize(f, f);
 
     mnVector3Cross(up, f, s);
+    mnVector3Normalize(s, s);
+
     mnVector3Cross(f, s, u);
 
     float tx = -mnVector3Dot(s, eye);

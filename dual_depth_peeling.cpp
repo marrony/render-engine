@@ -463,7 +463,8 @@ int main() {
         mnMatrix4Perspective(fov, aspect, znear, zfar, frameData.projection.values);
         float eye[3] = {cosf(angle)*10, 0, sinf(angle)*10};
         float at[3] = {0, 0, 0};
-        mnMatrix4LookAt(eye, at, frameData.view.values);
+        float up[3] = {0, 1, 0};
+        mnMatrix4LookAt(eye, at, up, frameData.view.values);
 
         device.copyConstantBuffer(sphere27Instances, instanceData, sizeof(instanceData));
         device.copyConstantBuffer(frameConstantBuffer, &frameData, sizeof(In_FrameData));

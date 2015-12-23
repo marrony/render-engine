@@ -45,7 +45,7 @@ struct TGAHeader {
     uint8_t image_descriptor;
 };
 
-bool readTga(FILE* stream, int& width, int& height, int& format, char*& pixels) {
+bool readTga(HeapAllocator& allocator, FILE* stream, Image& image) {
     TGAHeader header;
 
     fread(&header.id, sizeof(header.id), 1, stream);
@@ -75,7 +75,7 @@ bool readTga(FILE* stream, int& width, int& height, int& format, char*& pixels) 
 
     int pixel_size = header.pixel_depth / 8;
     int total_bytes = header.width * header.height * pixel_size;
-    char* data = new char[total_bytes];
+    char* data = (char*)allocator.allocate(total_bytes);
 
     if(data == nullptr) {
         return false;
@@ -119,20 +119,24 @@ bool readTga(FILE* stream, int& width, int& height, int& format, char*& pixels) 
 
     switch(pixel_size) {
         case 1:
+            image.width = header.width;
+            image.height = header.height;
+            image.format = 1;
+            image.pixels = data;
             break;
 
         case 3:
-            width = header.width;
-            height = header.height;
-            format = 3;
-            pixels = data;
+            image.width = header.width;
+            image.height = header.height;
+            image.format = 3;
+            image.pixels = data;
             break;
 
         case 4:
-            width = header.width;
-            height = header.height;
-            format = 4;
-            pixels = data;
+            image.width = header.width;
+            image.height = header.height;
+            image.format = 4;
+            image.pixels = data;
             break;
 
         default:

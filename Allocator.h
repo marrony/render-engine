@@ -84,20 +84,26 @@ public:
         else
             previous->next = current->next;
 
+        bytesAllocated += current->size;
+        numberAllocations++;
         return current->data;
     }
 
     void* reallocate(void* ptr, size_t newSize) {
-        FreeList* header = (FreeList*) ptr - 1;
-        size_t oldSize = header->size;
+        if(ptr != nullptr) {
+            FreeList* header = (FreeList*) ptr - 1;
+            size_t oldSize = header->size;
 
-        if (oldSize >= newSize)
-            return ptr;
+            if (oldSize >= newSize)
+                return ptr;
 
-        deallocate(ptr);
-        void* newPtr = allocate(newSize);
-        memcpy(newPtr, ptr, oldSize);
-        return newPtr;
+            deallocate(ptr);
+            void* newPtr = allocate(newSize);
+            memcpy(newPtr, ptr, oldSize);
+            return newPtr;
+        }
+
+        return allocate(newSize);
     }
 
     void deallocate(void* ptr) {

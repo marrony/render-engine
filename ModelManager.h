@@ -9,6 +9,7 @@
 #include "Model.h"
 #include "Material.h"
 #include "ModelInstance.h"
+#include "Wavefront.h"
 
 const int MAX_MODEL_NAME = 8;
 
@@ -41,19 +42,15 @@ public:
 
         uint32_t index = getSlot();
 
-        std::vector<Vector3> vertexData;
-        std::vector<Vector3> normalData;
-        std::vector<Vector3> tangentData;
-        std::vector<Vector2> textureData;
-        std::vector<uint16_t> indexData;
+        Shape shape;
 
-        ::createSphere(size, numberSlices, vertexData, normalData, tangentData, textureData, indexData);
+        mnCreateSphere(size, numberSlices, shape);
 
-        VertexBuffer vertexBuffer = device.createStaticVertexBuffer(vertexData.size()*sizeof(Vector3), vertexData.data());
-        VertexBuffer normalBuffer = device.createStaticVertexBuffer(normalData.size()*sizeof(Vector3), normalData.data());
-        VertexBuffer tangentBuffer = device.createStaticVertexBuffer(tangentData.size()*sizeof(Vector3), tangentData.data());
-        VertexBuffer textureBuffer = device.createStaticVertexBuffer(textureData.size()*sizeof(Vector2), textureData.data());
-        IndexBuffer indexBuffer = device.createIndexBuffer(indexData.size()*sizeof(uint16_t), indexData.data());
+        VertexBuffer vertexBuffer = device.createStaticVertexBuffer(shape.numberVertices*sizeof(Vector3), shape.vertices);
+        VertexBuffer normalBuffer = device.createStaticVertexBuffer(shape.numberVertices*sizeof(Vector3), shape.normals);
+        VertexBuffer tangentBuffer = device.createStaticVertexBuffer(shape.numberVertices*sizeof(Vector3), shape.tangent);
+        VertexBuffer textureBuffer = device.createStaticVertexBuffer(shape.numberVertices*sizeof(Vector2), shape.texture);
+        IndexBuffer indexBuffer = device.createIndexBuffer(shape.numberIndices*sizeof(uint16_t), shape.indices);
 
         VertexDeclaration vertexDeclaration[4];
         vertexDeclaration[0].buffer = vertexBuffer;
@@ -86,7 +83,67 @@ public:
         strncpy(models[index].name, name, MAX_MODEL_NAME);
         models[index].refs = 1;
 
-        Model::addMesh(allocator, models[index].model, 0, 0, indexData.size());
+        Model::addMesh(allocator, models[index].model, 0, 0, shape.numberIndices);
+
+        mnDestroyShape(shape);
+
+        return models[index].model;
+    }
+
+    Model* loadWavefront(const char* filename) {
+        uint32_t index = getSlot();
+
+        Wavefront obj;
+
+        mnLoadWavefront(allocator, filename, obj);
+
+        WavefrontObject* currentObj = obj.objects;
+
+        VertexBuffer vertexBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector3), currentObj->vertices);
+        VertexBuffer normalBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector3), currentObj->normals);
+        VertexBuffer tangentBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector3), currentObj->tangent);
+        VertexBuffer textureBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector2), currentObj->texture);
+        IndexBuffer indexBuffer = device.createIndexBuffer(currentObj->numberIndices*sizeof(uint16_t), currentObj->indices);
+
+        VertexDeclaration vertexDeclaration[4];
+        vertexDeclaration[0].buffer = vertexBuffer;
+        vertexDeclaration[0].format = VertexFloat3;
+        vertexDeclaration[0].offset = 0;
+        vertexDeclaration[0].stride = 0;
+
+        vertexDeclaration[1].buffer = textureBuffer;
+        vertexDeclaration[1].format = VertexFloat2;
+        vertexDeclaration[1].offset = 0;
+        vertexDeclaration[1].stride = 0;
+
+        vertexDeclaration[2].buffer = normalBuffer;
+        vertexDeclaration[2].format = VertexFloat3;
+        vertexDeclaration[2].offset = 0;
+        vertexDeclaration[2].stride = 0;
+
+        vertexDeclaration[3].buffer = tangentBuffer;
+        vertexDeclaration[3].format = VertexFloat3;
+        vertexDeclaration[3].offset = 0;
+        vertexDeclaration[3].stride = 0;
+
+        models[index].vertexBuffer[0] = vertexBuffer;
+        models[index].vertexBuffer[1] = textureBuffer;
+        models[index].vertexBuffer[2] = normalBuffer;
+        models[index].vertexBuffer[3] = tangentBuffer;
+        models[index].indexBuffer = indexBuffer;
+        models[index].vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
+
+        models[index].model = Model::create(allocator, models[index].vertexArray, currentObj->numberGroups);
+        strncpy(models[index].name, "venus", MAX_MODEL_NAME);
+        models[index].refs = 1;
+
+        for(int i = 0; i < currentObj->numberGroups; i++) {
+            WavefrontGroup* currentGroup = &currentObj->groups[i];
+
+            Model::addMesh(allocator, models[index].model, i, currentGroup->startIndices, currentGroup->numberIndices);
+        }
+
+        mnDestroyWavefront(allocator, obj);
 
         return models[index].model;
     }
