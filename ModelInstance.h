@@ -75,7 +75,10 @@ struct ModelInstance {
 
             if(instanceCount > 1) {
                 modelInstance->perMesh[i].draw = CommandBuffer::create(allocator, 1);
-                DrawTrianglesInstanced::create(modelInstance->perMesh[i].draw, mesh->offset, mesh->count, instanceCount);
+                if (model->hasIndices)
+                    DrawTrianglesInstanced::create(modelInstance->perMesh[i].draw, mesh->offset, mesh->count, instanceCount);
+                else
+                    DrawArraysInstanced::create(modelInstance->perMesh[i].draw, GL_TRIANGLES, mesh->offset, mesh->count, instanceCount);
             } else {
                 modelInstance->perMesh[i].draw = mesh->draw;
             }

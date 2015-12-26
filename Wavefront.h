@@ -44,7 +44,7 @@ struct Wavefront {
     WavefrontObject* objects;
 };
 
-bool mnLoadWavefront(HeapAllocator& allocator, const char* filename, Wavefront& wavefront);
+bool mnLoadWavefront(HeapAllocator& allocator, const char* filename, Wavefront& wavefront, bool forceNotIndexed = false);
 void mnDestroyWavefront(HeapAllocator& allocator, Wavefront& wavefront);
 
 #endif //WAVEFRONT_H

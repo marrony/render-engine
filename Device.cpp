@@ -158,10 +158,13 @@ VertexArray Device::createVertexArray(const VertexDeclaration* vertexDeclaration
         void* offset = vertexDeclarations[i].offset;
         VertexBuffer vertexBuffer = vertexDeclarations[i].buffer;
 
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id); CHECK_ERROR;
-
-        glVertexAttribPointer(i, format.size, format.type, GL_FALSE, stride, offset); CHECK_ERROR;
-        glEnableVertexAttribArray(i); CHECK_ERROR;
+        if (vertexBuffer.id != 0) {
+            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer.id); CHECK_ERROR;
+            glVertexAttribPointer(i, format.size, format.type, GL_FALSE, stride, offset); CHECK_ERROR;
+            glEnableVertexAttribArray(i); CHECK_ERROR;
+        } else {
+            glDisableVertexAttribArray(i); CHECK_ERROR;
+        }
     }
 
     glBindVertexArray(0);
@@ -627,8 +630,12 @@ void Device::drawTrianglesInstanced(int offset, int count, int instance) {
     glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, _offset, instance); CHECK_ERROR;
 }
 
-void Device::drawArraysTriangleStrip(int first, int count) {
-    glDrawArrays(GL_TRIANGLE_STRIP, first, count); CHECK_ERROR;
+void Device::drawArrays(int type, int first, int count) {
+    glDrawArrays(type, first, count); CHECK_ERROR;
+}
+
+void Device::drawArraysInstanced(int type, int first, int count, int instance) {
+    glDrawArraysInstanced(type, first, count, instance); CHECK_ERROR;
 }
 
 void Device::updateVertexBuffer(VertexBuffer vertexBuffer, size_t offset, size_t size, const void* data) {

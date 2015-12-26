@@ -107,6 +107,8 @@ public:
     }
 
     void deallocate(void* ptr) {
+        assert(ptr != nullptr);
+
         FreeList* node = (FreeList*) ptr - 1;
 
         assert(alreadyDeallocated(node) == false);

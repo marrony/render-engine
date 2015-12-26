@@ -209,7 +209,9 @@ public:
 
     void drawTrianglesInstanced(int offset, int count, int instance);
 
-    void drawArraysTriangleStrip(int first, int count);
+    void drawArrays(int type, int first, int count);
+
+    void drawArraysInstanced(int type, int first, int count, int instance);
 
     void updateVertexBuffer(VertexBuffer vertexBuffer, size_t offset, size_t size, const void* data);
 private:

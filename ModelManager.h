@@ -90,12 +90,12 @@ public:
         return models[index].model;
     }
 
-    Model* loadWavefront(const char* filename) {
+    Model* loadWavefront(const char* filename, bool forceNotIndexed = false) {
         uint32_t index = getSlot();
 
         Wavefront obj;
 
-        mnLoadWavefront(allocator, filename, obj);
+        mnLoadWavefront(allocator, filename, obj, forceNotIndexed);
 
         WavefrontObject* currentObj = obj.objects;
 
@@ -103,7 +103,11 @@ public:
         VertexBuffer normalBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector3), currentObj->normals);
         VertexBuffer tangentBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector3), currentObj->tangent);
         VertexBuffer textureBuffer = device.createStaticVertexBuffer(currentObj->numberVertices*sizeof(Vector2), currentObj->texture);
-        IndexBuffer indexBuffer = device.createIndexBuffer(currentObj->numberIndices*sizeof(uint16_t), currentObj->indices);
+        IndexBuffer indexBuffer = {0};
+
+        if (currentObj->numberIndices > 0) {
+            indexBuffer = device.createIndexBuffer(currentObj->numberIndices*sizeof(uint16_t), currentObj->indices);
+        }
 
         VertexDeclaration vertexDeclaration[4];
         vertexDeclaration[0].buffer = vertexBuffer;
@@ -133,7 +137,7 @@ public:
         models[index].indexBuffer = indexBuffer;
         models[index].vertexArray = device.createVertexArray(vertexDeclaration, 4, indexBuffer);
 
-        models[index].model = Model::create(allocator, models[index].vertexArray, currentObj->numberGroups);
+        models[index].model = Model::create(allocator, models[index].vertexArray, currentObj->numberGroups, currentObj->numberIndices > 0);
         strncpy(models[index].name, "venus", MAX_MODEL_NAME);
         models[index].refs = 1;
 

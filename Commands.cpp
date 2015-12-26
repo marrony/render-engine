@@ -5,6 +5,8 @@
 #include "Commands.h"
 
 const FnSubmitCommand submitCommand[] = {
+        [DRAW_ARRAYS] = FnSubmitCommand(DrawArrays::submit),
+        [DRAW_ARRAYS_INSTANCED] = FnSubmitCommand(DrawArraysInstanced::submit),
         [DRAW_TRIANGLES] = FnSubmitCommand(DrawTriangles::submit),
         [DRAW_TRIANGLES_INSTANCED] = FnSubmitCommand(DrawTrianglesInstanced::submit),
         [CLEAR_COLOR0] = FnSubmitCommand(ClearColor::submit),
@@ -51,6 +53,8 @@ const FnSubmitCommand submitCommand[] = {
 };
 
 const int sizeCommand[] = {
+        [DRAW_ARRAYS] = sizeof(DrawArrays),
+        [DRAW_ARRAYS_INSTANCED] = sizeof(DrawArraysInstanced),
         [DRAW_TRIANGLES] = sizeof(DrawTriangles),
         [DRAW_TRIANGLES_INSTANCED] = sizeof(DrawTrianglesInstanced),
         [CLEAR_COLOR0] = sizeof(ClearColor),

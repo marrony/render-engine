@@ -134,7 +134,7 @@ void TextManager::printText(Font fontId, Framebuffer framebuffer, const float co
 
         device.bindTexture(ch.texture, in_Sampler);
 
-        device.drawArraysTriangleStrip(0, 4);
+        device.drawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         x += ch.advance * scale;
     }

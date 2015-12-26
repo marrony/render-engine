@@ -11,7 +11,9 @@
 #include "Device.h"
 
 enum CommandType {
-    DRAW_TRIANGLES = 0,
+    DRAW_ARRAYS,
+    DRAW_ARRAYS_INSTANCED,
+    DRAW_TRIANGLES,
     DRAW_TRIANGLES_INSTANCED,
     CLEAR_COLOR0,
     CLEAR_COLOR1,
@@ -496,6 +498,48 @@ struct DrawTrianglesInstanced {
 
     static void submit(Device& device, DrawTrianglesInstanced* cmd) {
         device.drawTrianglesInstanced(cmd->offset, cmd->count, cmd->instances);
+    }
+};
+
+struct DrawArrays {
+    Command command;
+    int type;
+    int offset;
+    int count;
+
+    static const uint32_t TYPE = DRAW_ARRAYS;
+
+    static void create(CommandBuffer* commandBuffer, int type, int offset, int count) {
+        DrawArrays* drawArrays = getCommand<DrawArrays>(commandBuffer);
+        drawArrays->type = type;
+        drawArrays->offset = offset;
+        drawArrays->count = count;
+    }
+
+    static void submit(Device& device, DrawArrays* cmd) {
+        device.drawArrays(cmd->type, cmd->offset, cmd->count);
+    }
+};
+
+struct DrawArraysInstanced {
+    Command command;
+    int type;
+    int offset;
+    int count;
+    int instances;
+
+    static const uint32_t TYPE = DRAW_ARRAYS_INSTANCED;
+
+    static void create(CommandBuffer* commandBuffer, int type, int offset, int count, int instances) {
+        DrawArraysInstanced* drawArrays = getCommand<DrawArraysInstanced>(commandBuffer);
+        drawArrays->type = type;
+        drawArrays->offset = offset;
+        drawArrays->count = count;
+        drawArrays->instances = instances;
+    }
+
+    static void submit(Device& device, DrawArraysInstanced* cmd) {
+        device.drawArraysInstanced(cmd->type, cmd->offset, cmd->count, cmd->instances);
     }
 };
 

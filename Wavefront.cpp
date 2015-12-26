@@ -25,6 +25,9 @@ static void mnInitWavefrontObject(WavefrontObject* object) {
     object->tangent = nullptr;
     object->bitangent = nullptr;
     object->texture = nullptr;
+
+    object->numberIndices = 0;
+    object->indices = nullptr;
 }
 
 static WavefrontGroup* mnAddWavefrontGroup(HeapAllocator& allocator, WavefrontObject* object) {
@@ -91,6 +94,8 @@ struct WavefrontTemporary {
     int indexOffset;
     int vertexCount;
 
+    bool forceNotIndexed;
+
     std::map<WavefrontVertexIndex, int> indicesHashed;
 
     WavefrontVertexIndex* allVertexIndices;
@@ -100,21 +105,25 @@ struct WavefrontTemporary {
     uint16_t* indices;
 };
 
-static void mnWavefrontTemporaryInit(HeapAllocator& allocator, WavefrontTemporary* temporary) {
-    temporary->allocatedVertices = 50*1024;
-    temporary->allocatedIndices = 128*1024;
+static void mnWavefrontTemporaryInit(HeapAllocator& allocator, WavefrontTemporary* temporary, bool forceNotIndexed) {
+    temporary->allocatedVertices = 500*1024;
+    temporary->allocatedIndices = 10*500*1024;
     temporary->verticesParsed = 0;
     temporary->normalsParsed = 0;
     temporary->texturesParsed = 0;
     temporary->indexCount = 0;
     temporary->indexOffset = 0;
     temporary->vertexCount = 0;
+    temporary->forceNotIndexed = forceNotIndexed;
 
     temporary->allVertexIndices = (WavefrontVertexIndex*)allocator.allocate(sizeof(WavefrontVertexIndex) * temporary->allocatedIndices);
     temporary->vertices = (Vector3*)allocator.allocate(sizeof(Vector3) * temporary->allocatedVertices);
     temporary->normals = (Vector3*)allocator.allocate(sizeof(Vector3) * temporary->allocatedVertices);
     temporary->textures = (Vector2*)allocator.allocate(sizeof(Vector2) * temporary->allocatedVertices);
-    temporary->indices = (uint16_t*)allocator.allocate(sizeof(uint16_t) * temporary->allocatedIndices);
+    temporary->indices = nullptr;
+
+    if (!forceNotIndexed)
+        temporary->indices = (uint16_t*)allocator.allocate(sizeof(uint16_t) * temporary->allocatedIndices);
 }
 
 static void mnWavefrontTemporaryDestroy(HeapAllocator& allocator, WavefrontTemporary* temporary) {
@@ -122,7 +131,9 @@ static void mnWavefrontTemporaryDestroy(HeapAllocator& allocator, WavefrontTempo
     allocator.deallocate(temporary->vertices);
     allocator.deallocate(temporary->normals);
     allocator.deallocate(temporary->textures);
-    allocator.deallocate(temporary->indices);
+
+    if (temporary->indices != nullptr)
+        allocator.deallocate(temporary->indices);
 }
 
 static void mnWavefrontCopy(HeapAllocator& allocator, WavefrontObject* currentObject, WavefrontTemporary* temporary) {
@@ -132,13 +143,15 @@ static void mnWavefrontCopy(HeapAllocator& allocator, WavefrontObject* currentOb
     currentObject->tangent = (Vector3*)allocator.allocate(sizeof(Vector3) * temporary->vertexCount);
     currentObject->texture = (Vector2*)allocator.allocate(sizeof(Vector2) * temporary->vertexCount);
 
-    currentObject->numberIndices = temporary->indexCount;
-    currentObject->indices = (uint16_t*)allocator.allocate(sizeof(uint16_t) * temporary->indexCount);
-    memcpy(currentObject->indices, temporary->indices, sizeof(uint16_t) * temporary->indexCount);
+    if(!temporary->forceNotIndexed) {
+        currentObject->numberIndices = temporary->indexCount;
+        currentObject->indices = (uint16_t*)allocator.allocate(sizeof(uint16_t) * temporary->indexCount);
+        memcpy(currentObject->indices, temporary->indices, sizeof(uint16_t) * temporary->indexCount);
+    }
 
     for(int i = 0; i < temporary->vertexCount; i++) {
         WavefrontVertexIndex vertexIndex = temporary->allVertexIndices[i];
-        int index = temporary->indicesHashed[vertexIndex];
+        int index = temporary->forceNotIndexed ? i : temporary->indicesHashed[vertexIndex];
 
         assert(index < temporary->indexCount);
 
@@ -177,12 +190,12 @@ static void mnWavefrontCopy(HeapAllocator& allocator, WavefrontObject* currentOb
     temporary->indexOffset = 0;
 }
 
-bool mnLoadWavefront(HeapAllocator& allocator, const char* filename, Wavefront& wavefront) {
+bool mnLoadWavefront(HeapAllocator& allocator, const char* filename, Wavefront& wavefront, bool forceNotIndexed) {
     FILE* file = fopen(filename, "r");
     assert(file != NULL);
 
     WavefrontTemporary temporary;
-    mnWavefrontTemporaryInit(allocator, &temporary);
+    mnWavefrontTemporaryInit(allocator, &temporary, forceNotIndexed);
 
     wavefront.numberObjects = 0;
     wavefront.objects = nullptr;
@@ -244,16 +257,22 @@ bool mnLoadWavefront(HeapAllocator& allocator, const char* filename, Wavefront& 
 
                 if(indexParsed >= 3) {
                     for(int i = 0; i < 3; i++) {
+                        temporary.allVertexIndices[temporary.vertexCount] = vertexIndex[i];
+
                         int index = mnWavefrontVertexIndexFind(temporary.indicesHashed, vertexIndex[i]);
 
-                        if(index == -1) {
+                        if (forceNotIndexed || index == -1) {
                             temporary.indicesHashed[vertexIndex[i]] = temporary.vertexCount;
-                            temporary.allVertexIndices[temporary.vertexCount] = vertexIndex[i];
                             index = temporary.vertexCount;
                             temporary.vertexCount++;
                         }
 
-                        temporary.indices[temporary.indexCount++] = index;
+                        if (!forceNotIndexed) {
+                            assert(temporary.indexCount < temporary.allocatedIndices);
+                            temporary.indices[temporary.indexCount] = index;
+                        }
+
+                        temporary.indexCount++;
                     }
 
                     vertexIndex[1] = vertexIndex[2];
@@ -325,7 +344,9 @@ void mnDestroyWavefront(HeapAllocator& allocator, Wavefront& wavefront) {
         allocator.deallocate(wavefront.objects[i].normals);
         allocator.deallocate(wavefront.objects[i].tangent);
         allocator.deallocate(wavefront.objects[i].texture);
-        allocator.deallocate(wavefront.objects[i].indices);
+
+        if (wavefront.objects[i].indices != nullptr)
+            allocator.deallocate(wavefront.objects[i].indices);
     }
 
     allocator.deallocate(wavefront.objects);
