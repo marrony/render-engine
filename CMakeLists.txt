@@ -33,14 +33,17 @@ target_link_libraries(dual_depth_peeling ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES}
 add_executable(subsurface_scattering subsurface_scattering.cpp ${COMMON_SOURCE_FILES})
 target_link_libraries(subsurface_scattering ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES} ${FOUNDATION_LIBRARY})
 
-add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering PRE_BUILD
+add_executable(physically_based_shading physically_based_shading.cpp ${COMMON_SOURCE_FILES})
+target_link_libraries(physically_based_shading ${GLFW_LIBRARIES} ${FREETYPE_LIBRARIES} ${FOUNDATION_LIBRARY})
+
+add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering physically_based_shading PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/fonts $<TARGET_FILE_DIR:render_engine>/fonts)
 
-add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering PRE_BUILD
+add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering physically_based_shading PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/images $<TARGET_FILE_DIR:render_engine>/images)
 
-add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering PRE_BUILD
+add_custom_command(TARGET render_engine dual_depth_peeling subsurface_scattering physically_based_shading PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory
                    ${CMAKE_SOURCE_DIR}/models $<TARGET_FILE_DIR:render_engine>/models)
