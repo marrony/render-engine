@@ -444,7 +444,11 @@ struct BindProgram {
 
 struct BindTexture {
     Command command;
-    Texture2D texture;
+    bool isCube;
+    union {
+        Texture2D texture2D;
+        TextureCube textureCube;
+    };
     Sampler sampler;
 
     static const uint32_t TYPE = BIND_TEXTURE0;
@@ -452,13 +456,27 @@ struct BindTexture {
     static void create(CommandBuffer* commandBuffer, Texture2D texture, Sampler sampler, int unit) {
         BindTexture* bindTexture = getCommand<BindTexture>(commandBuffer);
         bindTexture->command.id += unit;
-        bindTexture->texture = texture;
+        bindTexture->isCube = false;
+        bindTexture->texture2D = texture;
+        bindTexture->sampler = sampler;
+    }
+
+    static void create(CommandBuffer* commandBuffer, TextureCube texture, Sampler sampler, int unit) {
+        BindTexture* bindTexture = getCommand<BindTexture>(commandBuffer);
+        bindTexture->command.id += unit;
+        bindTexture->isCube = true;
+        bindTexture->textureCube = texture;
         bindTexture->sampler = sampler;
     }
 
     static void submit(Device& device, BindTexture* cmd) {
         int unit = cmd->command.id - BIND_TEXTURE0;
-        device.bindTexture(cmd->texture, unit);
+
+        if (cmd->isCube)
+            device.bindTexture(cmd->textureCube, unit);
+        else
+            device.bindTexture(cmd->texture2D, unit);
+
         device.bindSampler(cmd->sampler, unit);
     }
 };

@@ -87,6 +87,13 @@ const VertexFormat VertexFloat2 = {2, GL_FLOAT};
 const VertexFormat VertexFloat3 = {3, GL_FLOAT};
 const VertexFormat VertexFloat4 = {4, GL_FLOAT};
 
+const int POSITIVE_X = 0;
+const int NEGATIVE_X = 1;
+const int POSITIVE_Y = 2;
+const int NEGATIVE_Y = 3;
+const int POSITIVE_Z = 4;
+const int NEGATIVE_Z = 5;
+
 struct VertexDeclaration {
     VertexFormat format;
     uint32_t stride;
@@ -136,6 +143,8 @@ public:
 
     Texture2D createRG32FTexture(int width, int height, const void* pixels);
 
+    TextureCube createRGBCubeTexture(int width, int height, void* pixels[6]);
+
     DepthTexture createDepth32FTexture(int width, int height);
 
     DepthStencilTexture createDepth24Stencil8Texture(int width, int height);
@@ -153,6 +162,8 @@ public:
     //////////////////////////////////////////////////
 
     void destroyTexture(Texture2D texture);
+
+    void destroyTexture(TextureCube texture);
 
     void destroyTexture(DepthStencilTexture texture);
 
@@ -199,6 +210,8 @@ public:
     void copyConstantBuffer(ConstantBuffer constantBuffer, const void* data, size_t size);
 
     void bindTexture(Texture2D texture, int unit);
+
+    void bindTexture(TextureCube texture, int unit);
 
     //TODO remove this method
     void setValue(Program program, const char* name, float x, float y, float z);

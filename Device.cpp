@@ -235,6 +235,43 @@ Texture2D createTexture(uint32_t& textureCount, int internalFormat, int width, i
     return {texId};
 }
 
+struct TextureCubeBinder {
+    GLint data;
+
+    TextureCubeBinder() {
+        glGetIntegerv(GL_TEXTURE_BINDING_CUBE_MAP, &data); CHECK_ERROR;
+    }
+
+    ~TextureCubeBinder() {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, data); CHECK_ERROR;
+    }
+};
+
+TextureCube createTextureCube(uint32_t& textureCount, int internalFormat, int width, int height, int format, int type, void* pixels[6]) {
+    TextureCubeBinder binder;
+
+    GLuint texId;
+    glGenTextures(1, &texId); CHECK_ERROR;
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texId); CHECK_ERROR;
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, internalFormat, width, height, 0, format, type, pixels[POSITIVE_X]);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, internalFormat, width, height, 0, format, type, pixels[NEGATIVE_X]);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, internalFormat, width, height, 0, format, type, pixels[POSITIVE_Y]);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, internalFormat, width, height, 0, format, type, pixels[NEGATIVE_Y]);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, internalFormat, width, height, 0, format, type, pixels[POSITIVE_Z]);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, internalFormat, width, height, 0, format, type, pixels[NEGATIVE_Z]);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE); CHECK_ERROR;
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
+
+    textureCount++;
+
+    return {texId};
+}
+
 Texture2D Device::createRGB16FTexture(int width, int height, const void* pixels) {
     return createTexture(textureCount, GL_RGB16F, width, height, GL_RGB, GL_FLOAT, pixels);
 }
@@ -273,6 +310,10 @@ Texture2D Device::createRTexture(int width, int height, const void* pixels) {
 
 Texture2D Device::createRG32FTexture(int width, int height, const void* pixels) {
     return createTexture(textureCount, GL_RG32F, width, height, GL_RGB, GL_FLOAT, pixels);
+}
+
+TextureCube Device::createRGBCubeTexture(int width, int height, void* pixels[6]) {
+    return createTextureCube(textureCount, GL_RGB, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
 }
 
 DepthTexture Device::createDepth32FTexture(int width, int height) {
@@ -457,6 +498,14 @@ void Device::destroyTexture(Texture2D texture) {
     textureCount--;
 }
 
+void Device::destroyTexture(TextureCube texture) {
+    if (texture.id == 0) return;
+
+    glDeleteTextures(1, &texture.id);
+
+    textureCount--;
+}
+
 void Device::destroyTexture(DepthStencilTexture texture) {
     if (texture.texture.id == 0) return;
 
@@ -604,6 +653,11 @@ void Device::copyConstantBuffer(ConstantBuffer constantBuffer, const void* data,
 void Device::bindTexture(Texture2D texture, int unit) {
     glActiveTexture(GL_TEXTURE0 + unit); CHECK_ERROR;
     glBindTexture(GL_TEXTURE_2D, texture.id); CHECK_ERROR;
+}
+
+void Device::bindTexture(TextureCube texture, int unit) {
+    glActiveTexture(GL_TEXTURE0 + unit); CHECK_ERROR;
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texture.id); CHECK_ERROR;
 }
 
 //TODO remove this method

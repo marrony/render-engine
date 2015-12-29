@@ -75,7 +75,7 @@ bool readTga(HeapAllocator& allocator, FILE* stream, Image& image) {
 
     int pixel_size = header.pixel_depth / 8;
     int total_bytes = header.width * header.height * pixel_size;
-    char* data = (char*)allocator.allocate(total_bytes);
+    uint8_t* data = (uint8_t*)allocator.allocate(total_bytes);
 
     if(data == nullptr) {
         return false;
@@ -84,7 +84,7 @@ bool readTga(HeapAllocator& allocator, FILE* stream, Image& image) {
     if(header.image_type == 10) {
         int bytes_to_process = total_bytes;
 
-        char* dst = data;
+        uint8_t* dst = data;
 
         while(bytes_to_process > 0) {
             int byte_read = fgetc(stream);
@@ -113,8 +113,9 @@ bool readTga(HeapAllocator& allocator, FILE* stream, Image& image) {
     }
 
     if(pixel_size >= 3) {
-        for(int i = 0; i < total_bytes; i += pixel_size)
+        for(int i = 0; i < total_bytes; i += pixel_size) {
             std::swap(data[i + 0], data[i + 2]);
+        }
     }
 
     switch(pixel_size) {
@@ -144,6 +145,13 @@ bool readTga(HeapAllocator& allocator, FILE* stream, Image& image) {
     }
 
     return true;
+}
+
+void readTga(HeapAllocator& allocator, const char* filename, Image& tgaImage) {
+    FILE* stream = fopen(filename, "rb");
+    assert(stream != nullptr);
+    readTga(allocator, stream, tgaImage);
+    fclose(stream);
 }
 
 #endif //TGAREADER_H

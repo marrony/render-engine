@@ -41,6 +41,12 @@ struct GBuffer {
 
 \n#ifdef FRAGMENT_SHADER\n
 
+layout(std140) uniform in_FrameData {
+    mat4 projection;
+    mat4 view;
+    vec4 cameraPosition;
+};
+
 vec3 calculateLight(vec3 position, vec3 normal, vec4 albedo, LightData light) {
     vec3 lightVec = light.position - position;
     vec3 lightDir = normalize(lightVec);
@@ -91,6 +97,7 @@ layout(location = 3) in vec3 in_Tangent;
 layout(std140) uniform in_FrameData {
     mat4 projection;
     mat4 view;
+    vec4 cameraPosition;
 };
 
 layout(std140) uniform in_InstanceData {

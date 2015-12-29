@@ -60,17 +60,18 @@ public:
         FreeList* current = freeList;
         FreeList* previous = nullptr;
 
+        size = roundSize(size);
+
         while(current) {
-            if(current->size >= size)
-                break;
+            size_t percent = size * 100 / current->size;
+
+            if(percent >= 75 && percent <= 100) break;
 
             previous = current;
             current = current->next;
         }
 
         if(!current) {
-            size = roundSize(size);
-
             bytesAllocated += size;
             numberAllocations++;
 
@@ -113,11 +114,15 @@ public:
 
         assert(alreadyDeallocated(node) == false);
 
-        node->next = freeList;
-        freeList = node;
-
         numberAllocations--;
         bytesAllocated -= node->size;
+
+        if (node->size > 128*1024) {
+            free(node);
+        } else {
+            node->next = freeList;
+            freeList = node;
+        }
     }
 
     size_t memoryUsed() {
