@@ -251,6 +251,8 @@ layout(std140) uniform in_MaterialData {
 
 uniform samplerCube skyboxIrradiance;
 uniform samplerCube skyboxCube;
+uniform samplerCube prefilterEnv;
+uniform sampler2D integrateBRDFTex;
 uniform sampler2D normalTexture;
 
 in vec3 normalWS;
@@ -282,6 +284,10 @@ const float M_SQRT1_2  = 0.707106781186547524400844362104849039;  /* 1/sqrt(2)  
 
 vec4 textureCube(samplerCube cube, vec3 V) {
     return texture(cube, V*vec3(1, -1, 1));
+}
+
+vec4 textureCubeLod(samplerCube cube, vec3 V, float lod) {
+    return textureLod(cube, V*vec3(1, -1, 1), lod);
 }
 
 vec3 lerp(vec3 x, vec3 y, float a) {
@@ -699,9 +705,11 @@ vec3 approximateSpecularIBL(vec3 specularColor, float roughness, vec3 N, vec3 V)
     float NdotV = max(0, dot(N, V));
     vec3 R = reflect(-V, N);
 
-    vec3 prefilteredColor = prefilterEnvMap(roughness, R);
-//    vec3 prefilteredColor = filterEnvMap(roughness, N, V);
-    vec2 envBRDF = integrateBRDF(roughness, NdotV);
+//    vec3 prefilteredColor = prefilterEnvMap(roughness, R);
+    vec3 prefilteredColor = textureCubeLod(prefilterEnv, R, roughness * 7).rgb; //fixme
+
+//    vec2 envBRDF = integrateBRDF(roughness, NdotV);
+    vec2 envBRDF = texture(integrateBRDFTex, vec2(roughness, NdotV)).rg;
 
     return prefilteredColor * ( specularColor*envBRDF.x + envBRDF.y );
 }
@@ -743,6 +751,21 @@ void main() {
         diffuse = diffuseIBL(diffuseColor, roughness, N, V);
 
     fragColor.rgb = diffuse + specular;
+
+//DEBUG - split object in 4
+//    if(gl_FragCoord.x >= 640) {
+//        if(gl_FragCoord.y >= 480) {
+//            fragColor.rgb = approximateSpecularIBL(F0, roughness, N, V);
+//        } else {
+//            fragColor.rgb = specularIBL(F0, roughness, N, V);
+//        }
+//    } else {
+//        if(gl_FragCoord.y >= 480) {
+//            fragColor.rgb = diffuseColor * textureCube(skyboxIrradiance, N).rgb;
+//        } else {
+//            fragColor.rgb = diffuseIBL(diffuseColor, roughness, N, V);
+//        }
+//    }
 }
 );
 
@@ -800,54 +823,52 @@ int main() {
     const int WIDTH = 1024;
     const int HEIGHT = 1024;
 
-    Image irradianceImg[6];
-    Image skyboxImg[6];
+    ImageCube irradianceImg;
+    ImageCube prefilterEnvImg[8];
+    Image integrateBRDFImg;
+    ImageCube skyboxImg;
 
 #define IMG_PATH "images/LancellottiChapel"
 
-    loadImage(heapAllocator, IMG_PATH"/irradiance_posx.irr", irradianceImg[POSITIVE_X]);
-    loadImage(heapAllocator, IMG_PATH"/irradiance_negx.irr", irradianceImg[NEGATIVE_X]);
-    loadImage(heapAllocator, IMG_PATH"/irradiance_posy.irr", irradianceImg[POSITIVE_Y]);
-    loadImage(heapAllocator, IMG_PATH"/irradiance_negy.irr", irradianceImg[NEGATIVE_Y]);
-    loadImage(heapAllocator, IMG_PATH"/irradiance_posz.irr", irradianceImg[POSITIVE_Z]);
-    loadImage(heapAllocator, IMG_PATH"/irradiance_negz.irr", irradianceImg[NEGATIVE_Z]);
+    loadCube(heapAllocator, IMG_PATH"/diffuse_irradiance.irr", irradianceImg);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_0.irr", prefilterEnvImg[0]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_1.irr", prefilterEnvImg[1]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_2.irr", prefilterEnvImg[2]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_3.irr", prefilterEnvImg[3]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_4.irr", prefilterEnvImg[4]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_5.irr", prefilterEnvImg[5]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_6.irr", prefilterEnvImg[6]);
+    loadCube(heapAllocator, IMG_PATH"/prefilter_env_map_7.irr", prefilterEnvImg[7]);
 
-    readJpeg(heapAllocator, IMG_PATH"/posx.jpg", skyboxImg[POSITIVE_X]);
-    readJpeg(heapAllocator, IMG_PATH"/negx.jpg", skyboxImg[NEGATIVE_X]);
-    readJpeg(heapAllocator, IMG_PATH"/posy.jpg", skyboxImg[POSITIVE_Y]);
-    readJpeg(heapAllocator, IMG_PATH"/negy.jpg", skyboxImg[NEGATIVE_Y]);
-    readJpeg(heapAllocator, IMG_PATH"/posz.jpg", skyboxImg[POSITIVE_Z]);
-    readJpeg(heapAllocator, IMG_PATH"/negz.jpg", skyboxImg[NEGATIVE_Z]);
+    loadImage(heapAllocator, IMG_PATH"/integrate_brdf.irr", integrateBRDFImg);
 
-    void* irradiancePixels[6] = {
-            irradianceImg[POSITIVE_X].pixels,
-            irradianceImg[NEGATIVE_X].pixels,
-            irradianceImg[POSITIVE_Y].pixels,
-            irradianceImg[NEGATIVE_Y].pixels,
-            irradianceImg[POSITIVE_Z].pixels,
-            irradianceImg[NEGATIVE_Z].pixels,
-    };
+    readJpeg(heapAllocator, IMG_PATH"/posx.jpg", skyboxImg.faces[POSITIVE_X]);
+    readJpeg(heapAllocator, IMG_PATH"/negx.jpg", skyboxImg.faces[NEGATIVE_X]);
+    readJpeg(heapAllocator, IMG_PATH"/posy.jpg", skyboxImg.faces[POSITIVE_Y]);
+    readJpeg(heapAllocator, IMG_PATH"/negy.jpg", skyboxImg.faces[NEGATIVE_Y]);
+    readJpeg(heapAllocator, IMG_PATH"/posz.jpg", skyboxImg.faces[POSITIVE_Z]);
+    readJpeg(heapAllocator, IMG_PATH"/negz.jpg", skyboxImg.faces[NEGATIVE_Z]);
 
-    void* skyboxPixels[6] = {
-            skyboxImg[POSITIVE_X].pixels,
-            skyboxImg[NEGATIVE_X].pixels,
-            skyboxImg[POSITIVE_Y].pixels,
-            skyboxImg[NEGATIVE_Y].pixels,
-            skyboxImg[POSITIVE_Z].pixels,
-            skyboxImg[NEGATIVE_Z].pixels,
-    };
-
-    TextureCube skyboxIrradiance = device.createRGBCubeTexture(irradianceImg[0].width, irradianceImg[0].height, irradiancePixels);
-    TextureCube skyboxCube = device.createRGBCubeTexture(skyboxImg[0].width, skyboxImg[0].height, skyboxPixels);
+    TextureCube skyboxIrradiance = createTextureCube(device, &irradianceImg, 1);
+    TextureCube prefilterEnv = createTextureCube(device, prefilterEnvImg, 8);
+    TextureCube skyboxCube = createTextureCube(device, &skyboxImg, 1);
+    Texture2D integrateBRDF = createTexture2D(device, integrateBRDFImg);
 
     Texture2D skybox[6];
 
     for(int i = 0; i < 6; i++) {
-        skybox[i] = device.createRGBTexture(skyboxImg[i].width, skyboxImg[i].height, skyboxImg[i].pixels);
+        skybox[i] = device.createRGBTexture(skyboxImg.faces[i].width, skyboxImg.faces[i].height, skyboxImg.faces[i].pixels);
 
-        heapAllocator.deallocate(skyboxImg[i].pixels);
-        heapAllocator.deallocate(irradianceImg[i].pixels);
+        heapAllocator.deallocate(skyboxImg.faces[i].pixels);
+        heapAllocator.deallocate(irradianceImg.faces[i].pixels);
     }
+
+    for(int i = 0; i < 8; i++) {
+        for(int j = 0; j < 6; j++)
+            heapAllocator.deallocate(prefilterEnvImg[i].faces[j].pixels);
+    }
+
+    heapAllocator.deallocate(integrateBRDFImg.pixels);
 
     Texture2D normalTexture = textureManager.loadTexture("images/lion_ddn.tga");
 
@@ -886,6 +907,8 @@ int main() {
     device.setTextureBindingPoint(physicallyBasedShader, "skyboxIrradiance", 0);
     device.setTextureBindingPoint(physicallyBasedShader, "skyboxCube", 1);
     device.setTextureBindingPoint(physicallyBasedShader, "normalTexture", 2);
+    device.setTextureBindingPoint(physicallyBasedShader, "prefilterEnv", 3);
+    device.setTextureBindingPoint(physicallyBasedShader, "integrateBRDFTex", 4);
 
     device.setConstantBufferBindingPoint(physicallyBasedShader, "in_FrameData", BINDING_POINT_FRAME_DATA);
     device.setConstantBufferBindingPoint(physicallyBasedShader, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
@@ -972,11 +995,11 @@ int main() {
 
     float angleLight = 0;
 
-    materialData.roughness = 0.0;
-    materialData.metallic = 0.0;
+    materialData.roughness = 0.5;
+    materialData.metallic = 1.0;
     materialData.specularity = 0.5;
     materialData.ior = 0.0;
-    materialData.approximationSpecular = false;
+    materialData.approximationSpecular = true;
     materialData.approximationDiffuse = false;
     baseColorIndex = 0;
 
@@ -1051,6 +1074,8 @@ int main() {
             BindTexture::create(scenePass, skyboxIrradiance, {0}, 0);
             BindTexture::create(scenePass, skyboxCube, {0}, 1);
             BindTexture::create(scenePass, normalTexture, {0}, 2);
+            BindTexture::create(scenePass, prefilterEnv, {0}, 3);
+            BindTexture::create(scenePass, integrateBRDF, {0}, 4);
         }
 
         renderQueue.submit(0, &scenePassCommon, 1);
@@ -1116,9 +1141,11 @@ int main() {
         device.destroyConstantBuffer(skyboxConstantBuffer[i]);
 
     device.destroyTexture(skyboxIrradiance);
+    device.destroyTexture(prefilterEnv);
     device.destroyTexture(skyboxCube);
     device.destroyTexture(depthTexture);
     device.destroyTexture(debugTexture);
+    device.destroyTexture(integrateBRDF);
     for(int i = 0; i < 6; i++)
         device.destroyTexture(skybox[i]);
 
