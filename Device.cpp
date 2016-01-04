@@ -247,25 +247,36 @@ struct TextureCubeBinder {
     }
 };
 
-TextureCube createTextureCube(uint32_t& textureCount, int internalFormat, int width, int height, int format, int type, void* pixels[6]) {
+TextureCube createTextureCube(uint32_t& textureCount, int internalFormat, int format, int type, const ImageCube cubes[], int mipLevels) {
     TextureCubeBinder binder;
 
     GLuint texId;
     glGenTextures(1, &texId); CHECK_ERROR;
 
     glBindTexture(GL_TEXTURE_CUBE_MAP, texId); CHECK_ERROR;
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, internalFormat, width, height, 0, format, type, pixels[POSITIVE_X]);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 0, internalFormat, width, height, 0, format, type, pixels[NEGATIVE_X]);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, internalFormat, width, height, 0, format, type, pixels[POSITIVE_Y]);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, 0, internalFormat, width, height, 0, format, type, pixels[NEGATIVE_Y]);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, 0, internalFormat, width, height, 0, format, type, pixels[POSITIVE_Z]);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, internalFormat, width, height, 0, format, type, pixels[NEGATIVE_Z]);
+
+    for(int i = 0; i < mipLevels; i++) {
+        const ImageCube& cube = cubes[i];
+
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X, i, internalFormat, cube.faces[POSITIVE_X].width, cube.faces[POSITIVE_X].height, 0, format, type, cube.faces[POSITIVE_X].pixels); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_X, i, internalFormat, cube.faces[NEGATIVE_X].width, cube.faces[NEGATIVE_X].height, 0, format, type, cube.faces[NEGATIVE_X].pixels); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, i, internalFormat, cube.faces[POSITIVE_Y].width, cube.faces[POSITIVE_Y].height, 0, format, type, cube.faces[POSITIVE_Y].pixels); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Y, i, internalFormat, cube.faces[NEGATIVE_Y].width, cube.faces[NEGATIVE_Y].height, 0, format, type, cube.faces[NEGATIVE_Y].pixels); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_Z, i, internalFormat, cube.faces[POSITIVE_Z].width, cube.faces[POSITIVE_Z].height, 0, format, type, cube.faces[POSITIVE_Z].pixels); CHECK_ERROR;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, i, internalFormat, cube.faces[NEGATIVE_Z].width, cube.faces[NEGATIVE_Z].height, 0, format, type, cube.faces[NEGATIVE_Z].pixels); CHECK_ERROR;
+    }
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); CHECK_ERROR;
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); CHECK_ERROR;
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE); CHECK_ERROR;
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
+
+    if (mipLevels == 1) {
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST); CHECK_ERROR;
+    } else {
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); CHECK_ERROR;
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR); CHECK_ERROR;
+    }
 
     textureCount++;
 
@@ -312,8 +323,12 @@ Texture2D Device::createRG32FTexture(int width, int height, const void* pixels) 
     return createTexture(textureCount, GL_RG32F, width, height, GL_RGB, GL_FLOAT, pixels);
 }
 
-TextureCube Device::createRGBCubeTexture(int width, int height, void* pixels[6]) {
-    return createTextureCube(textureCount, GL_RGB, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+TextureCube Device::createRGBCubeTexture(const ImageCube cube[], int mipLevels) {
+    return createTextureCube(textureCount, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE, cube, mipLevels);
+}
+
+TextureCube Device::createRGBCubeTexture(const ImageCube& cube) {
+    return createTextureCube(textureCount, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE, &cube, 1);
 }
 
 DepthTexture Device::createDepth32FTexture(int width, int height) {

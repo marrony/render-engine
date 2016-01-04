@@ -7,13 +7,6 @@
 
 #include <type_traits>
 
-struct Image {
-    int width;
-    int height;
-    int format;
-    uint8_t* pixels;
-};
-
 void loadImage(HeapAllocator& allocator, const char* filename, Image& image) {
     FILE* file = fopen(filename, "rb");
 
@@ -28,7 +21,7 @@ void loadImage(HeapAllocator& allocator, const char* filename, Image& image) {
     fclose(file);
 }
 
-void saveImage(const char* filename, Image& image) {
+void saveImage(const char* filename, const Image& image) {
     FILE* file = fopen(filename, "wb");
 
     assert(file != nullptr);
@@ -39,6 +32,67 @@ void saveImage(const char* filename, Image& image) {
     fwrite(image.pixels, sizeof(uint8_t), image.width*image.height*image.format, file);
 
     fclose(file);
+}
+
+void loadCube(HeapAllocator& allocator, const char* filename, ImageCube& cube) {
+    FILE* file = fopen(filename, "rb");
+
+    assert(file != nullptr);
+
+    int width, height, format;
+
+    fread(&width, sizeof(int), 1, file);
+    fread(&height, sizeof(int), 1, file);
+    fread(&format, sizeof(int), 1, file);
+
+    for(int i = 0; i < 6; i++) {
+        cube.faces[i].width = width;
+        cube.faces[i].height = height;
+        cube.faces[i].format = format;
+        cube.faces[i].pixels = (uint8_t*)allocator.allocate(width*height*format);
+        fread(cube.faces[i].pixels, sizeof(uint8_t), width*height*format, file);
+    }
+
+    fclose(file);
+}
+
+void saveCube(const char* filename, const ImageCube& cube) {
+    FILE* file = fopen(filename, "wb");
+
+    assert(file != nullptr);
+
+    int width = cube.faces[0].width;
+    int height = cube.faces[0].height;
+    int format = cube.faces[0].format;
+
+    fwrite(&width, sizeof(int), 1, file);
+    fwrite(&height, sizeof(int), 1, file);
+    fwrite(&format, sizeof(int), 1, file);
+
+    for(int i = 0; i < 6; i++)
+        fwrite(cube.faces[i].pixels, sizeof(uint8_t), width*height*format, file);
+
+    fclose(file);
+}
+
+Texture2D createTexture2D(Device& device, const Image& image) {
+    if(image.format == 1)
+        return device.createRTexture(image.width, image.height, image.pixels);
+
+    if(image.format == 3)
+        return device.createRGBTexture(image.width, image.height, image.pixels);
+
+    if(image.format == 4)
+        return device.createRGBATexture(image.width, image.height, image.pixels);
+
+    return {0};
+}
+
+TextureCube createTextureCube(Device& device, const ImageCube cube[], int mipLevels) {
+    if(cube[0].faces[0].format == 3)
+        return device.createRGBCubeTexture(cube, mipLevels);
+
+    return {0};
 }
 
 #include "TgaReader.h"

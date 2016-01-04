@@ -101,6 +101,17 @@ struct VertexDeclaration {
     VertexBuffer buffer;
 };
 
+struct Image {
+    int width;
+    int height;
+    int format;
+    uint8_t* pixels;
+};
+
+struct ImageCube {
+    Image faces[6];
+};
+
 class Device {
 public:
     Device();
@@ -143,7 +154,9 @@ public:
 
     Texture2D createRG32FTexture(int width, int height, const void* pixels);
 
-    TextureCube createRGBCubeTexture(int width, int height, void* pixels[6]);
+    TextureCube createRGBCubeTexture(const ImageCube cube[], int mipLevels);
+
+    TextureCube createRGBCubeTexture(const ImageCube& cube);
 
     DepthTexture createDepth32FTexture(int width, int height);
 
