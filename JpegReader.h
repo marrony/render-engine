@@ -30,20 +30,14 @@ bool readJpeg(HeapAllocator& allocator, FILE* stream, Image& image) {
     image.format = srcinfo.num_components;
     image.pixels = (uint8_t*)allocator.allocate( srcinfo.image_width * srcinfo.image_height * srcinfo.num_components );
 
-    JSAMPROW row_pointer = (JSAMPROW)allocator.allocate( srcinfo.image_width * srcinfo.num_components );
+    int row_size = srcinfo.num_components*srcinfo.image_width;
 
     while (srcinfo.output_scanline < srcinfo.image_height) {
-        jpeg_read_scanlines(&srcinfo, &row_pointer, 1);
+        int row = srcinfo.image_height - srcinfo.output_scanline - 1;
 
-        int s = srcinfo.image_height - srcinfo.output_scanline;
-
-        for (int i = 0; i < srcinfo.image_width * srcinfo.num_components; i += srcinfo.num_components) {
-            for (int j = 0; j < srcinfo.num_components; j++)
-                image.pixels[3*s*srcinfo.image_width + i+j] = row_pointer[i+j];
-        }
+        JSAMPROW row_ptr = &image.pixels[row*row_size];
+        jpeg_read_scanlines(&srcinfo, &row_ptr, 1);
     }
-
-    allocator.deallocate( row_pointer );
 
     jpeg_finish_decompress( &srcinfo );
     jpeg_destroy_decompress( &srcinfo );
