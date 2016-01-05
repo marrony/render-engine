@@ -175,8 +175,8 @@ float* cosineSampleHemisphere( float E[2], float Out[4] ) {
 }
 
 void normalForFace(int face, int x, int y, int width, int height, float N[3]) {
-    float s = x / (float)(width-1);
-    float t = y / (float)(height-1);
+    float s = width == 1 ? 0.5 : x / (float)(width - 1);
+    float t = height == 1 ? 0.5 : y / (float)(height - 1);
 
     float xx = s * 2 - 1;
     float yy = t * 2 - 1;
@@ -245,7 +245,7 @@ void computeDiffuseIrradiance(HeapAllocator& allocator, const ImageCube& input, 
     for(int face = 0; face < 6; face++) {
         output.faces[face].width = width;
         output.faces[face].height = height;
-        output.faces[face].format = input.faces[face].format;
+        output.faces[face].format = 3;
         output.faces[face].pixels = (uint8_t*)allocator.allocate(3 * width * height);
         memset(output.faces[face].pixels, 0, 3 * width * height);
     }
@@ -355,15 +355,30 @@ void computePrefilterEnvMap(HeapAllocator& allocator, const ImageCube& input, fl
     for(int face = 0; face < 6; face++) {
         output.faces[face].width = width;
         output.faces[face].height = height;
-        output.faces[face].format = input.faces[face].format;
+        output.faces[face].format = 3;
         output.faces[face].pixels = (uint8_t*)allocator.allocate(3 * width * height);
         memset(output.faces[face].pixels, 0, 3 * width * height);
     }
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    for(int face = 0; face < 6; face++) {
+    for(int face = 0; face < 6; face++)
         computePrefilterEnvMapForFace(face, input, roughness, output.faces[face]);
+
+    if(width == 1 && height == 1) {
+        float color[3] = {0, 0, 0};
+
+        for(int i = 0; i < 6; i++) {
+            float temp[3];
+
+            imageGet3(output.faces[i], 0, 0, temp);
+            mnVector3Add(color, temp, color);
+        }
+
+        mnVector3MulScalar(color, 1.0f / 6.0f, color);
+
+        for(int i = 0; i < 6; i++)
+            imageSet3(output.faces[i], 0, 0, color);
     }
 
     auto end = std::chrono::high_resolution_clock::now();

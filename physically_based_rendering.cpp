@@ -93,10 +93,12 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
             materialData.useTBNMatrix = !materialData.useTBNMatrix;
             break;
         case GLFW_KEY_S:
-            materialData.approximationSpecular = !materialData.approximationSpecular;
+            materialData.approximationSpecular++;
+            materialData.approximationSpecular %= 3;
             break;
         case GLFW_KEY_D:
-            materialData.approximationDiffuse = !materialData.approximationDiffuse;
+            materialData.approximationDiffuse++;
+            materialData.approximationDiffuse %= 2;
             break;
         case GLFW_KEY_SPACE:
             autoAngle = !autoAngle;
@@ -245,8 +247,8 @@ layout(std140) uniform in_MaterialData {
     float specularity;
     float ior;
     bool useTBNMatrix;
-    bool approximationSpecular;
-    bool approximationDiffuse;
+    int approximationSpecular;
+    int approximationDiffuse;
 };
 
 uniform samplerCube skyboxIrradiance;
@@ -705,11 +707,19 @@ vec3 approximateSpecularIBL(vec3 specularColor, float roughness, vec3 N, vec3 V)
     float NdotV = max(0, dot(N, V));
     vec3 R = reflect(-V, N);
 
-//    vec3 prefilteredColor = prefilterEnvMap(roughness, R);
-    vec3 prefilteredColor = textureCubeLod(prefilterEnv, R, roughness * 7).rgb; //fixme
+    vec2 size = textureSize(prefilterEnv, 0);
+    float maxLod = log2(max(size.x, size.y));
 
-//    vec2 envBRDF = integrateBRDF(roughness, NdotV);
-    vec2 envBRDF = texture(integrateBRDFTex, vec2(roughness, NdotV)).rg;
+    vec3 prefilteredColor;
+    vec2 envBRDF;
+
+    if(approximationSpecular == 1) {
+        prefilteredColor = prefilterEnvMap(roughness, R);
+        envBRDF = integrateBRDF(roughness, NdotV);
+    } else {
+        prefilteredColor = textureCubeLod(prefilterEnv, R, roughness * maxLod).rgb;
+        envBRDF = texture(integrateBRDFTex, vec2(roughness, NdotV)).rg;
+    }
 
     return prefilteredColor * ( specularColor*envBRDF.x + envBRDF.y );
 }
@@ -739,33 +749,18 @@ void main() {
     vec3 F0 = specularColor;
 
     vec3 specular = vec3(0);
-    if(approximationSpecular)
-        specular = approximateSpecularIBL(F0, roughness, N, V);
-    else
+    if(approximationSpecular == 0)
         specular = specularIBL(F0, roughness, N, V);
+    else
+        specular = approximateSpecularIBL(F0, roughness, N, V);
 
     vec3 diffuse = vec3(0);
-    if(approximationDiffuse)
-        diffuse = diffuseColor * textureCube(skyboxIrradiance, N).rgb;
-    else
+    if(approximationDiffuse == 0)
         diffuse = diffuseIBL(diffuseColor, roughness, N, V);
+    else
+        diffuse = diffuseColor * textureCube(skyboxIrradiance, N).rgb;
 
     fragColor.rgb = diffuse + specular;
-
-//DEBUG - split object in 4
-//    if(gl_FragCoord.x >= 640) {
-//        if(gl_FragCoord.y >= 480) {
-//            fragColor.rgb = approximateSpecularIBL(F0, roughness, N, V);
-//        } else {
-//            fragColor.rgb = specularIBL(F0, roughness, N, V);
-//        }
-//    } else {
-//        if(gl_FragCoord.y >= 480) {
-//            fragColor.rgb = diffuseColor * textureCube(skyboxIrradiance, N).rgb;
-//        } else {
-//            fragColor.rgb = diffuseIBL(diffuseColor, roughness, N, V);
-//        }
-//    }
 }
 );
 
@@ -999,8 +994,8 @@ int main() {
     materialData.metallic = 1.0;
     materialData.specularity = 0.5;
     materialData.ior = 0.0;
-    materialData.approximationSpecular = true;
-    materialData.approximationDiffuse = false;
+    materialData.approximationSpecular = 0;
+    materialData.approximationDiffuse = 0;
     baseColorIndex = 0;
 
     while (!glfwWindowShouldClose(window)) {
@@ -1113,8 +1108,10 @@ int main() {
 
         const float color[3] = {1, 1, 1};
         textManager.printText(fontSmall, {0}, color, 10, 540, "Bump: %s", materialData.useTBNMatrix ? "Yes" : "No");
-        textManager.printText(fontSmall, {0}, color, 10, 480, "Specular: %s", materialData.approximationSpecular ? "Approx. IBL" : "IBL");
-        textManager.printText(fontSmall, {0}, color, 10, 420, "Diffuse: %s", materialData.approximationDiffuse ? "Approx. IBL" : "IBL");
+        textManager.printText(fontSmall, {0}, color, 10, 480, "Specular: %s",
+                (materialData.approximationSpecular == 0) ? "Real Time IBL" : ((materialData.approximationSpecular == 1) ? "Real Time Approx. IBL" : "Approx. IBL Tex"));
+        textManager.printText(fontSmall, {0}, color, 10, 420, "Diffuse: %s",
+                (materialData.approximationDiffuse == 0) ? "Real Time IBL" : "Approx. IBL Tex");
         textManager.printText(fontSmall, {0}, color, 10, 360, "Base color: %s", baseColorNames[baseColorIndex]);
         textManager.printText(fontSmall, {0}, color, 10, 300, "IOR: %.2f", materialData.ior);
         textManager.printText(fontSmall, {0}, color, 10, 240, "Specularity: %.2f", materialData.specularity);
