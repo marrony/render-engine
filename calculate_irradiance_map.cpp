@@ -399,6 +399,14 @@ float GVis_smithGGX(float roughness, float NdotV, float NdotL) {
     return 1 / (G1_smithGGX(alpha, NdotL) * G1_smithGGX(alpha, NdotV));
 }
 
+float G_smithGGX(float roughness, float NdotV, float NdotL) {
+    float alpha = roughness*roughness;
+    float v = 2*(NdotV) / G1_smithGGX(alpha, NdotV);
+    float l = 2*(NdotL) / G1_smithGGX(alpha, NdotL);
+
+    return v*l;
+}
+
 void integrateBRDF(float roughness, float NdotV, float out[2]) {
     float V[3];
     V[0] = sqrtf(1 - NdotV * NdotV);
@@ -422,10 +430,13 @@ void integrateBRDF(float roughness, float NdotV, float out[2]) {
         float VdotH = std::max(0.0f, mnVector3Dot(V, H));
 
         if(NdotL > 0) {
-            //f = DFG / (4*NdotV*NdotL)
-
+#if 1
             float G_Vis = GVis_smithGGX(roughness, NdotV, NdotL);
             float NdotL_G_Vis_Pdf = NdotL * G_Vis * (4 * VdotH / NdotH);
+#else
+            float G = G_smithGGX(roughness, NdotV, NdotL);
+            float NdotL_G_Vis_Pdf = G * VdotH / (NdotH * NdotV);
+#endif
 
             float Fc = pow(1 - VdotH, 5);
             A += (1 - Fc) * NdotL_G_Vis_Pdf;
