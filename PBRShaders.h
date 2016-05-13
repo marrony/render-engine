@@ -59,6 +59,7 @@ uniform samplerCube skyboxCube;
 uniform samplerCube prefilterEnv;
 uniform sampler2D integrateBRDFTex;
 uniform sampler2D normalTexture;
+uniform sampler2D metallicTexture;
 
 in vec3 normalWS;
 in vec3 normalCS;
@@ -562,7 +563,7 @@ vec3 approximateSpecularIBL(vec3 F0, float roughness, vec3 N, vec3 V) {
     return prefilteredColor * ( F0*envBRDF.x + envBRDF.y );
 }
 
-void main() {
+vec3 PBR(float roughness, float metallic) {
     vec3 N = normalize(normalWS);
     vec3 L = normalize(lightWS);
     vec3 V = normalize(viewWS);
@@ -577,9 +578,6 @@ void main() {
         vec3 normal = texture(normalTexture, texCoord).xyz * 2 - 1;
         N = normalize(TBN * normal);
     }
-
-//    vec3 _F0 = vec3((1 - ior) / (1 + ior));
-//    vec3 F0 = mix(_F0*_F0, baseColor.rgb, 1-metallic);
 
     float dieletric = 0.08 * specularity;
     vec3 diffuseColor = baseColor.rgb - baseColor.rgb*metallic;
@@ -598,7 +596,13 @@ void main() {
     else
         diffuse = diffuseColor * textureCube(skyboxIrradiance, N).rgb;
 
-    fragColor.rgb = diffuse + specular;
+    return diffuse + specular;
+}
+
+void main() {
+    float m = texture(metallicTexture, texCoord).r;
+
+    fragColor.rgb = PBR(roughness, metallic);
 }
 );
 

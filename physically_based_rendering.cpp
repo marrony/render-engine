@@ -205,6 +205,10 @@ void main() {
 #include "PBRShaders.h"
 
 int main() {
+    float v[3] = {1, 1, 1};
+
+    float x = mnVector3Length(v);
+
     if (!glfwInit())
         return -1;
 
@@ -213,7 +217,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(640, 480, "Physically Based Rendering", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(700, 480, "Physically Based Rendering", NULL, NULL);
 
     if (!window) {
         glfwTerminate();
@@ -305,7 +309,8 @@ int main() {
 
     heapAllocator.deallocate(integrateBRDFImg.pixels);
 
-    Texture2D normalTexture = textureManager.loadTexture("images/lion_ddn.tga");
+    Texture2D normalTexture = textureManager.loadTexture("images/rockwall_normal.tga");
+    Texture2D metallicTexture = textureManager.loadTexture("images/metallic.jpg");
 
     Model* sphereModel = modelManager.createSphere("sphere01", 1.0, 20);
     Model* quadModel = modelManager.createQuad("quad");
@@ -344,6 +349,7 @@ int main() {
     device.setTextureBindingPoint(physicallyBasedShader, "normalTexture", 2);
     device.setTextureBindingPoint(physicallyBasedShader, "prefilterEnv", 3);
     device.setTextureBindingPoint(physicallyBasedShader, "integrateBRDFTex", 4);
+    device.setTextureBindingPoint(physicallyBasedShader, "metallicTexture", 5);
 
     device.setConstantBufferBindingPoint(physicallyBasedShader, "in_FrameData", BINDING_POINT_FRAME_DATA);
     device.setConstantBufferBindingPoint(physicallyBasedShader, "in_InstanceData", BINDING_POINT_INSTANCE_DATA);
@@ -508,9 +514,10 @@ int main() {
             BindProgram::create(scenePass, physicallyBasedShader);
             BindTexture::create(scenePass, skyboxIrradiance, {0}, 0);
             BindTexture::create(scenePass, skyboxCube, {0}, 1);
-            BindTexture::create(scenePass, normalTexture, {0}, 2);
+            BindTexture::create(scenePass, normalTexture, textureManager.getLinear(), 2);
             BindTexture::create(scenePass, prefilterEnv, {0}, 3);
             BindTexture::create(scenePass, integrateBRDF, {0}, 4);
+            BindTexture::create(scenePass, metallicTexture, {0}, 5);
         }
 
         renderQueue.submit(0, &scenePassCommon, 1);
@@ -547,13 +554,13 @@ int main() {
 #endif
 
         const float color[3] = {1, 1, 1};
-        textManager.printText(fontSmall, {0}, color, 10, 540, "Bump: %s", materialData.useTBNMatrix ? "Yes" : "No");
-        textManager.printText(fontSmall, {0}, color, 10, 480, "Specular: %s",
-                (materialData.approximationSpecular == 0) ? "Real Time IBL" : ((materialData.approximationSpecular == 1) ? "Real Time Approx. IBL" : "Approx. IBL Tex"));
-        textManager.printText(fontSmall, {0}, color, 10, 420, "Diffuse: %s",
-                (materialData.approximationDiffuse == 0) ? "Real Time IBL" : "Approx. IBL Tex");
-        textManager.printText(fontSmall, {0}, color, 10, 360, "Base color: %s", baseColorNames[baseColorIndex]);
-        textManager.printText(fontSmall, {0}, color, 10, 300, "IOR: %.2f", materialData.ior);
+//        textManager.printText(fontSmall, {0}, color, 10, 480, "Bump: %s", materialData.useTBNMatrix ? "Yes" : "No");
+//        textManager.printText(fontSmall, {0}, color, 10, 420, "Specular: %s",
+//                (materialData.approximationSpecular == 0) ? "Real Time IBL" : ((materialData.approximationSpecular == 1) ? "Real Time Approx. IBL" : "Approx. IBL Tex"));
+//        textManager.printText(fontSmall, {0}, color, 10, 360, "Diffuse: %s",
+//                (materialData.approximationDiffuse == 0) ? "Real Time IBL" : "Approx. IBL Tex");
+        textManager.printText(fontSmall, {0}, color, 10, 300, "Base color: %s", baseColorNames[baseColorIndex]);
+        //textManager.printText(fontSmall, {0}, color, 10, 300, "IOR: %.2f", materialData.ior);
         textManager.printText(fontSmall, {0}, color, 10, 240, "Specularity: %.2f", materialData.specularity);
         textManager.printText(fontSmall, {0}, color, 10, 180, "Metallic: %.2f", materialData.metallic);
         textManager.printText(fontSmall, {0}, color, 10, 120, "Roughness: %.2f", materialData.roughness);
@@ -564,6 +571,7 @@ int main() {
     }
 
     textureManager.unloadTexture(normalTexture);
+    textureManager.unloadTexture(metallicTexture);
 
     modelManager.destroyModel(sphereModel);
     modelManager.destroyModel(quadModel);
